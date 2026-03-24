@@ -20,4 +20,9 @@ class Risk extends Model
         'residual_risk_score', 'mitigation_strategy', 'action_treatment', 
         'owner', 'resolved_by', 'method', 'status', 'department_id'
     ];
+
+    public function controls()
+    {
+        return $this->hasMany(RiskControl::class, 'risk_id');
+    }
 }

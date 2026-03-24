@@ -10,7 +10,7 @@ class RiskController extends Controller
 {
     public function index()
     {
-        return response()->json(Risk::orderBy('id', 'DESC')->get());
+        return response()->json(Risk::with('controls')->orderBy('id', 'DESC')->get());
     }
 
     public function store(Request $request)
