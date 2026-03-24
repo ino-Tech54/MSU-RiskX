@@ -40,6 +40,7 @@ Route::prefix('risks')->group(function () {
     Route::get('/', [RiskController::class, 'index']);
     Route::post('/', [RiskController::class, 'store']);
     Route::post('/update', [RiskController::class, 'update']);
+    Route::delete('/{id}', [RiskController::class, 'destroy']);
 });
 
 Route::get('/risk-metadata', [RiskController::class, 'getMetadata']);
@@ -48,6 +49,7 @@ Route::post('/risk-controls', [RiskController::class, 'addControl']);
 Route::prefix('she-events')->group(function () {
     Route::get('/', [SheController::class, 'index']);
     Route::post('/', [SheController::class, 'store']);
+    Route::delete('/{id}', [SheController::class, 'destroy']);
 });
 
 Route::get('/she-metadata', [SheController::class, 'getMetadata']);

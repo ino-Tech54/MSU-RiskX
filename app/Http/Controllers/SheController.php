@@ -65,4 +65,11 @@ class SheController extends Controller
             'departments' => $departments
         ]);
     }
+
+    public function destroy($id)
+    {
+        $event = SheEvent::findOrFail($id);
+        $event->delete();
+        return response()->json(['message' => 'SHE record deleted successfully']);
+    }
 }

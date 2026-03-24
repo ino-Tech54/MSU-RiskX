@@ -41,14 +41,32 @@ class RiskController extends Controller
         ]);
 
         $risk = Risk::findOrFail($request->id);
+        $input = $request->all();
 
-        if ($request->has('date_reviewed') && $risk->date_reviewed && $request->date_reviewed < $risk->date_reviewed) {
-            return response()->json(['error' => "New review date cannot be before the previous review date (" . $risk->date_reviewed . ")"], 400);
+        // Calculate scores if likelihood/consequence changed
+        if (isset($input['inherent_likelihood']) || isset($input['inherent_consequence'])) {
+            $input['inherent_risk_score'] = $this->calculateScore(
+                $input['inherent_likelihood'] ?? $risk->inherent_likelihood, 
+                $input['inherent_consequence'] ?? $risk->inherent_consequence
+            );
+        }
+        if (isset($input['residual_likelihood']) || isset($input['residual_consequence'])) {
+            $input['residual_risk_score'] = $this->calculateScore(
+                $input['residual_likelihood'] ?? $risk->residual_likelihood, 
+                $input['residual_consequence'] ?? $risk->residual_consequence
+            );
         }
 
-        $risk->update($request->only(['date_reviewed', 'status']));
+        $risk->update($input);
 
-        return response()->json(['message' => 'Risk updated successfully']);
+        return response()->json(['message' => 'Risk record updated successfully']);
+    }
+
+    public function destroy($id)
+    {
+        $risk = Risk::findOrFail($id);
+        $risk->delete();
+        return response()->json(['message' => 'Risk record deleted successfully']);
     }
 
     public function addControl(Request $request)
