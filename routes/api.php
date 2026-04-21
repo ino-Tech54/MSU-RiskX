@@ -63,3 +63,9 @@ Route::post('/monte-carlo/simulate', [App\Http\Controllers\MonteCarloController:
         return $request->user();
     });
 });
+
+// Internal System-to-System routes (IP & Secret Key protected)
+Route::prefix('v1/internal')->middleware('internal.api')->group(function () {
+    Route::get('/risks', [RiskController::class, 'index']);
+});
+
