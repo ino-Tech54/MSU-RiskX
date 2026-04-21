@@ -23,8 +23,9 @@ class InternalSystemAccess
         }
 
         // 2. Check if the IP is allowed (optional layer of security)
-        if (!in_array($request->ip(), $allowedIps)) {
+        if (!in_array('*', $allowedIps) && !in_array($request->ip(), $allowedIps)) {
              return response()->json([
+
                 'error' => 'IP Forbidden',
                 'message' => 'Your IP address is not authorized for internal API access.'
             ], 403);
