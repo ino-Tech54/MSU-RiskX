@@ -6,6 +6,9 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\RiskController;
 use App\Http\Controllers\SheController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\LossEventController;
+use App\Http\Controllers\BcmController;
+use App\Http\Controllers\ReportsController;
 
 use App\Http\Controllers\AdminController;
 
@@ -44,7 +47,9 @@ Route::prefix('risks')->group(function () {
 });
 
 Route::get('/risk-metadata', [RiskController::class, 'getMetadata']);
+Route::get('/risk-controls', [RiskController::class, 'controls']);
 Route::post('/risk-controls', [RiskController::class, 'addControl']);
+Route::delete('/risk-controls/{id}', [RiskController::class, 'destroyControl']);
 
 Route::prefix('she-events')->group(function () {
     Route::get('/', [SheController::class, 'index']);
@@ -59,6 +64,24 @@ Route::get('/dashboard-stats', [DashboardController::class, 'stats']);
 // Monte Carlo Analysis
 Route::post('/monte-carlo/simulate', [App\Http\Controllers\MonteCarloController::class, 'simulate']);
 
+Route::prefix('loss-events')->group(function () {
+    Route::get('/', [LossEventController::class, 'index']);
+    Route::post('/', [LossEventController::class, 'store']);
+    Route::put('/{id}', [LossEventController::class, 'update']);
+    Route::delete('/{id}', [LossEventController::class, 'destroy']);
+});
+Route::get('/loss-metadata', [LossEventController::class, 'metadata']);
+
+Route::prefix('bcm-plans')->group(function () {
+    Route::get('/', [BcmController::class, 'index']);
+    Route::post('/', [BcmController::class, 'store']);
+    Route::put('/{id}', [BcmController::class, 'update']);
+    Route::delete('/{id}', [BcmController::class, 'destroy']);
+});
+Route::get('/bcm-metadata', [BcmController::class, 'metadata']);
+
+Route::get('/reports/summary', [ReportsController::class, 'summary']);
+
     Route::get('/user', function (Request $request) {
         return $request->user();
     });
@@ -68,6 +91,5 @@ Route::post('/monte-carlo/simulate', [App\Http\Controllers\MonteCarloController:
 Route::prefix('v1/internal')->middleware('internal.api')->group(function () {
     Route::get('/risks', [RiskController::class, 'index']);
 });
-
 
 

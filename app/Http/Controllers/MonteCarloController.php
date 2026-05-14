@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Risk;
 use App\Models\SheEvent;
+use App\Models\LossEvent;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class MonteCarloController extends Controller
 {
@@ -25,11 +27,17 @@ class MonteCarloController extends Controller
 
         $riskQuery = Risk::whereIn('status', ['Open', 'In Progress']);
         $sheQuery = SheEvent::whereNotIn('status', ['Completed', 'Closed']);
+        $lossQuery = Schema::hasTable('loss_events')
+            ? LossEvent::whereNotIn('status', ['Closed', 'Resolved'])
+            : null;
 
         // Apply filters if provided
         if ($dept = $request->input('department')) {
             $riskQuery->where('department_id', $dept);
             $sheQuery->where('department', $dept);
+            if ($lossQuery) {
+                $lossQuery->where('department_id', $dept);
+            }
         }
 
         if ($cat = $request->input('category')) {
@@ -39,6 +47,7 @@ class MonteCarloController extends Controller
 
         $risks = $riskQuery->get();
         $sheEvents = $sheQuery->get();
+        $lossEvents = $lossQuery ? $lossQuery->get() : collect();
 
         $startTime = microtime(true);
         $results = [];
@@ -48,9 +57,9 @@ class MonteCarloController extends Controller
 
             // Simulate Risks
             foreach ($risks as $risk) {
-                $likelihood = (float)$risk->residual_likelihood / 5.0; // Simple mapping: 5/5 = 100%
+                $likelihood = $this->scaleToProbability($risk->residual_likelihood);
                 if ($this->hit($likelihood)) {
-                    $baseImpact = $mapping[$risk->residual_consequence] ?? 0;
+                    $baseImpact = $mapping[$this->scaleToNumber($risk->residual_consequence)] ?? 0;
                     $totalLoss += $this->sample($distributionType, $baseImpact);
                 }
             }
@@ -66,6 +75,14 @@ class MonteCarloController extends Controller
                         'Low' => $mapping[1] ?? 5000
                     ];
                     $baseImpact = $impactMapping[$event->priority] ?? ($mapping[2] ?? 10000);
+                    $totalLoss += $this->sample($distributionType, $baseImpact);
+                }
+            }
+
+            // Simulate realized loss history as direct empirical exposure.
+            foreach ($lossEvents as $lossEvent) {
+                $baseImpact = (float) $lossEvent->financial_impact;
+                if ($baseImpact > 0 && $this->hit(0.35)) {
                     $totalLoss += $this->sample($distributionType, $baseImpact);
                 }
             }
@@ -112,14 +129,36 @@ class MonteCarloController extends Controller
                 'iterations' => $iterations,
                 'execution_time' => round($executionTime, 4),
                 'risk_count' => $risks->count(),
-                'she_count' => $sheEvents->count()
+                'she_count' => $sheEvents->count(),
+                'loss_count' => $lossEvents->count()
             ],
             'chartData' => $chartData,
             'sources' => [
                 'risks' => $risks->map(fn($r) => ['id' => $r->sn, 'description' => $r->risk_description]),
-                'she' => $sheEvents->map(fn($e) => ['id' => $e->action_id, 'description' => $e->activity_category])
+                'she' => $sheEvents->map(fn($e) => ['id' => $e->action_id, 'description' => $e->activity_category]),
+                'losses' => $lossEvents->map(fn($e) => ['id' => $e->loss_reference, 'description' => $e->event_title])
             ]
         ]);
+    }
+
+    private function scaleToNumber($value)
+    {
+        $map = [
+            'VERY LOW' => 1, 'LOW' => 2, 'TOLERABLE' => 3, 'HIGH' => 4, 'EXTREME' => 5,
+            'INSIGNIFICANT' => 1, 'MINOR' => 2, 'MODERATE' => 3, 'MAJOR' => 4, 'CATASTROPHIC' => 5,
+            'RARE' => 1, 'UNLIKELY' => 2, 'POSSIBLE' => 3, 'LIKELY' => 4, 'ALMOST CERTAIN' => 5,
+        ];
+
+        if (is_numeric($value)) {
+            return max(1, min(5, (int) $value));
+        }
+
+        return $map[strtoupper((string) $value)] ?? 3;
+    }
+
+    private function scaleToProbability($value)
+    {
+        return $this->scaleToNumber($value) / 5.0;
     }
 
     private function hit($probability)

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Risk;
+use App\Models\RiskControl;
 use Illuminate\Support\Facades\DB;
 
 class RiskController extends Controller
@@ -113,6 +114,19 @@ class RiskController extends Controller
             DB::rollBack();
             return response()->json(['error' => 'Failed to add control: ' . $e->getMessage()], 500);
         }
+    }
+
+    public function controls(Request $request)
+    {
+        return response()->json(RiskControl::orderBy('created_at', 'DESC')->get());
+    }
+
+    public function destroyControl(Request $request, $id)
+    {
+        $control = RiskControl::findOrFail($id);
+        $control->delete();
+
+        return response()->json(['message' => 'Control removed successfully']);
     }
 
     public function getMetadata()
