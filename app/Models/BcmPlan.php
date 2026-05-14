@@ -18,10 +18,12 @@ class BcmPlan extends Model
         'plan_id',
         'plan_reference',
         'plan_name',
+        'scope_type',
         'critical_process',
         'dependencies',
         'department_id',
         'risk_id',
+        'she_event_id',
         'rto_hours',
         'rpo_hours',
         'plan_status',
@@ -44,6 +46,11 @@ class BcmPlan extends Model
     public function risk()
     {
         return $this->belongsTo(Risk::class, 'risk_id', 'id');
+    }
+
+    public function sheEvent()
+    {
+        return $this->belongsTo(SheEvent::class, 'she_event_id', 'id');
     }
 
     public function owner()
