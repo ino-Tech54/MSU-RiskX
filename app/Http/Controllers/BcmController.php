@@ -61,6 +61,7 @@ class BcmController extends Controller
         }
 
         $plan = BcmPlan::create($data);
+        $this->logActivity($request, 'BCM Plan Created', 'Created continuity plan ' . $plan->plan_reference . ': ' . $plan->plan_name);
 
         return response()->json([
             'message' => 'Continuity plan recorded successfully',
@@ -111,6 +112,7 @@ class BcmController extends Controller
         }
 
         $plan->update($data);
+        $this->logActivity($request, 'BCM Plan Updated', 'Updated continuity plan ' . $plan->plan_reference . ' fields: ' . implode(', ', array_keys($data)));
 
         return response()->json([
             'message' => 'Continuity plan updated successfully',
@@ -126,7 +128,11 @@ class BcmController extends Controller
     {
         $this->authorizeModule($request, 'Business Continuity', 'delete');
 
-        BcmPlan::findOrFail($id)->delete();
+        $plan = BcmPlan::findOrFail($id);
+        $reference = $plan->plan_reference;
+        $name = $plan->plan_name;
+        $plan->delete();
+        $this->logActivity($request, 'BCM Plan Deleted', 'Deleted continuity plan ' . $reference . ': ' . $name);
 
         return response()->json(['message' => 'Continuity plan deleted successfully']);
     }

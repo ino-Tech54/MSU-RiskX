@@ -47,6 +47,7 @@ class LossEventController extends Controller
         $data['status'] = $data['status'] ?? 'Open';
 
         $event = LossEvent::create($data);
+        $this->logActivity($request, 'Loss Event Created', 'Created loss event ' . $event->loss_reference . ': ' . $event->event_title);
 
         return response()->json([
             'message' => 'Loss event recorded successfully',
@@ -74,6 +75,7 @@ class LossEventController extends Controller
         ]);
 
         $event->update($data);
+        $this->logActivity($request, 'Loss Event Updated', 'Updated loss event ' . $event->loss_reference . ' fields: ' . implode(', ', array_keys($data)));
 
         return response()->json([
             'message' => 'Loss event updated successfully',
@@ -85,7 +87,11 @@ class LossEventController extends Controller
     {
         $this->authorizeModule($request, 'Loss Events', 'delete');
 
-        LossEvent::findOrFail($id)->delete();
+        $event = LossEvent::findOrFail($id);
+        $reference = $event->loss_reference;
+        $title = $event->event_title;
+        $event->delete();
+        $this->logActivity($request, 'Loss Event Deleted', 'Deleted loss event ' . $reference . ': ' . $title);
 
         return response()->json(['message' => 'Loss event deleted successfully']);
     }

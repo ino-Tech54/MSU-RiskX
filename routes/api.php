@@ -43,6 +43,10 @@ Route::prefix('risks')->group(function () {
     Route::get('/', [RiskController::class, 'index']);
     Route::post('/', [RiskController::class, 'store']);
     Route::post('/update', [RiskController::class, 'update']);
+    Route::post('/approve', [RiskController::class, 'approve']);
+    Route::post('/reject', [RiskController::class, 'reject']);
+    Route::post('/import', [RiskController::class, 'importCsv']);
+    Route::get('/due-reviews', [RiskController::class, 'dueReviews']);
     Route::delete('/{id}', [RiskController::class, 'destroy']);
 });
 
@@ -54,6 +58,7 @@ Route::delete('/risk-controls/{id}', [RiskController::class, 'destroyControl']);
 Route::prefix('she-events')->group(function () {
     Route::get('/', [SheController::class, 'index']);
     Route::post('/', [SheController::class, 'store']);
+    Route::post('/import', [SheController::class, 'importCsv']);
     Route::delete('/{id}', [SheController::class, 'destroy']);
 });
 
@@ -81,6 +86,11 @@ Route::prefix('bcm-plans')->group(function () {
 Route::get('/bcm-metadata', [BcmController::class, 'metadata']);
 
 Route::get('/reports/summary', [ReportsController::class, 'summary']);
+Route::get('/reports/risks', [ReportsController::class, 'risks']);
+Route::get('/reports/she-events', [ReportsController::class, 'sheEvents']);
+Route::get('/reports/loss-events', [ReportsController::class, 'lossEvents']);
+Route::get('/reports/bcm-plans', [ReportsController::class, 'bcmPlans']);
+Route::get('/reports/audit-trail', [ReportsController::class, 'auditTrail']);
 
     Route::get('/user', function (Request $request) {
         return $request->user();

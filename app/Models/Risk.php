@@ -18,7 +18,9 @@ class Risk extends Model
         'inherent_consequence', 'inherent_risk_score', 'existing_controls', 
         'control_effectiveness', 'residual_likelihood', 'residual_consequence', 
         'residual_risk_score', 'mitigation_strategy', 'action_treatment', 
-        'owner', 'resolved_by', 'method', 'status', 'department_id'
+        'owner', 'resolved_by', 'method', 'status', 'department_id',
+        'likelihood_justification', 'consequence_justification',
+        'approval_status', 'approved_by', 'approved_at', 'rejection_reason'
     ];
 
     public function controls()

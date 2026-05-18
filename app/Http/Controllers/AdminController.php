@@ -10,6 +10,7 @@ use App\Models\Role;
 use App\Models\Permission;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class AdminController extends Controller
@@ -31,11 +32,12 @@ class AdminController extends Controller
             $entityIds = array_merge([$u->user_id], $roleIds);
             $u->permissions = DB::table('permissions')
                 ->whereIn('entity_id', $entityIds)
-                ->select('section_name', 
-                    DB::raw('MAX(can_view) as can_view'), 
-                    DB::raw('MAX(can_add) as can_add'), 
-                    DB::raw('MAX(can_edit) as can_edit'), 
-                    DB::raw('MAX(can_delete) as can_delete'))
+                ->select('section_name',
+                    DB::raw('MAX(can_view) as can_view'),
+                    DB::raw('MAX(can_add) as can_add'),
+                    DB::raw('MAX(can_edit) as can_edit'),
+                    DB::raw('MAX(can_delete) as can_delete'),
+                    DB::raw('MAX(can_approve) as can_approve'))
                 ->groupBy('section_name')
                 ->get();
         }
@@ -106,9 +108,11 @@ class AdminController extends Controller
             }
 
             DB::commit();
+            $this->logActivity($request, 'User Created', 'Created user account ' . $request->username . ' (' . $request->email . ')');
             return response()->json(['message' => 'User created successfully', 'user_id' => $userId]);
         } catch (\Exception $e) {
             DB::rollBack();
+            $this->logActivity($request, 'Failed User Creation', 'Failed creating user ' . $request->email . ': ' . $e->getMessage(), 'failed');
             return response()->json(['error' => 'Failed to create user: ' . $e->getMessage()], 500);
         }
     }
@@ -118,6 +122,7 @@ class AdminController extends Controller
         $user = User::findOrFail($id);
         $user->is_active = $request->is_active ? 1 : 0;
         $user->save();
+        $this->logActivity($request, 'User Status Updated', 'Updated user ' . $id . ' status to ' . ($user->is_active ? 'active' : 'inactive'));
         return response()->json(['message' => 'Status updated']);
     }
 
@@ -127,13 +132,16 @@ class AdminController extends Controller
         $user = User::findOrFail($id);
         $user->password = Hash::make($request->password);
         $user->save();
+        $this->logActivity($request, 'Password Reset', 'Reset password for user ' . $id);
         return response()->json(['message' => 'Password reset successful']);
     }
 
     public function deleteUser($id)
     {
+        $user = User::findOrFail($id);
         DB::table('user_roles')->where('user_id', $id)->delete();
-        User::findOrFail($id)->delete();
+        $user->delete();
+        $this->logActivity(request(), 'User Deleted', 'Deleted user account ' . $id);
         return response()->json(['message' => 'User deleted']);
     }
 
@@ -151,31 +159,35 @@ class AdminController extends Controller
             DB::table('permissions')->updateOrInsert(
                 ['permission_id' => $id . '_' . str_replace(' ', '_', $section)],
                 [
-                    'entity_id' => $id,
+                    'entity_id'   => $id,
                     'entity_type' => $entityType,
-                    'section_name' => $section,
-                    'can_view' => $p['view'] ? 1 : 0,
-                    'can_add' => $p['add'] ? 1 : 0,
-                    'can_edit' => $p['edit'] ? 1 : 0,
-                    'can_delete' => $p['delete'] ? 1 : 0,
-                    'created_at' => now()
+                    'section_name'=> $section,
+                    'can_view'    => $p['view']    ? 1 : 0,
+                    'can_add'     => $p['add']     ? 1 : 0,
+                    'can_edit'    => $p['edit']    ? 1 : 0,
+                    'can_delete'  => $p['delete']  ? 1 : 0,
+                    'can_approve' => $p['approve'] ?? 0,
+                    'created_at'  => now()
                 ]
             );
         }
+        $this->logActivity($request, 'Permissions Updated', 'Updated permissions for ' . $entityType . ' ' . $id);
         return response()->json(['message' => 'Permissions saved successfully']);
     }
 
     public function auditLogs()
     {
+        $statusSelect = Schema::hasColumn('activity_logs', 'status') ? "COALESCE(al.status, 'success')" : "'success'";
         $sql = "
             SELECT 
                 al.action, 
-                CONCAT(u.first_name, ' ', u.last_name) as initiator, 
+                COALESCE(CONCAT(u.first_name, ' ', u.last_name), 'Unknown/System') as initiator, 
                 al.created_at as timestamp, 
-                al.ip_address as ip, 
-                'success' as status 
+                al.ip_address as ip,
+                al.details,
+                {$statusSelect} as status 
             FROM activity_logs al
-            JOIN users u ON al.user_id = u.user_id
+            LEFT JOIN users u ON al.user_id = u.user_id
             
             UNION ALL
             
@@ -184,6 +196,7 @@ class AdminController extends Controller
                 CONCAT(u.first_name, ' ', u.last_name) as initiator, 
                 rd.created_at as timestamp, 
                 'Local-Storage' as ip, 
+                CONCAT('Document ', rd.file_name, ' uploaded to risk documents') as details,
                 'success' as status
             FROM risk_documents rd
             JOIN users u ON rd.uploaded_by = u.user_id
@@ -195,6 +208,7 @@ class AdminController extends Controller
                 'System' as initiator, 
                 created_at as timestamp, 
                 'Internal' as ip, 
+                CONCAT('User account ', username, ' was created') as details,
                 'success' as status
             FROM users
             

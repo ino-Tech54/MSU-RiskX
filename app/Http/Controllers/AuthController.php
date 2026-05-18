@@ -20,10 +20,12 @@ class AuthController extends Controller
         $user = User::with('department')->where('email', $request->email)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
+            $this->logActivity($request, 'Failed Login', 'Failed login attempt for email ' . $request->email, 'failed', $user->user_id ?? null);
             return response()->json(['error' => 'Invalid credentials'], 401);
         }
 
         if ($user->is_active === 0) {
+            $this->logActivity($request, 'Failed Login', 'Inactive account login attempt for email ' . $request->email, 'failed', $user->user_id);
             return response()->json(['error' => 'Account inactive. Please contact system admin.'], 403);
         }
 
@@ -44,26 +46,23 @@ class AuthController extends Controller
         $entityIds = array_merge([$user->user_id], $roleIds);
         $permissions = DB::table('permissions')
             ->whereIn('entity_id', $entityIds)
-            ->select('section_name', 
-                DB::raw('MAX(can_view) as can_view'), 
-                DB::raw('MAX(can_add) as can_add'), 
-                DB::raw('MAX(can_edit) as can_edit'), 
-                DB::raw('MAX(can_delete) as can_delete'))
+            ->select('section_name',
+                DB::raw('MAX(can_view) as can_view'),
+                DB::raw('MAX(can_add) as can_add'),
+                DB::raw('MAX(can_edit) as can_edit'),
+                DB::raw('MAX(can_delete) as can_delete'),
+                DB::raw('MAX(can_approve) as can_approve'))
             ->groupBy('section_name')
             ->get();
 
-        // Log activity
-        DB::table('activity_logs')->insert([
-            'user_id' => $user->user_id,
-            'action' => 'User Login',
-            'details' => 'Successful authentication via Laravel API',
-            'ip_address' => $request->ip(),
-            'created_at' => now()
-        ]);
+        $this->logActivity($request, 'User Login', 'Successful authentication via Laravel API', 'success', $user->user_id);
+
+        $token = $user->createToken('auth_token', ['*'], now()->addHours(8));
 
         return response()->json([
             'message' => 'Login successful',
-            'access_token' => $user->createToken('auth_token')->plainTextToken,
+            'access_token' => $token->plainTextToken,
+            'expires_at' => now()->addHours(8)->toISOString(),
             'user' => [
                 'user_id' => $user->user_id,
                 'username' => $user->username,
@@ -93,6 +92,8 @@ class AuthController extends Controller
 
         $user->password = Hash::make($request->new_password);
         $user->save();
+
+        $this->logActivity($request, 'Password Changed', 'User changed password for email ' . $request->email, 'success', $user->user_id);
 
         return response()->json(['message' => 'Password updated successfully.']);
     }
