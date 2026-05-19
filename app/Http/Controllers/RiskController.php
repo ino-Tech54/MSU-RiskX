@@ -295,19 +295,37 @@ class RiskController extends Controller
         return response()->json(['message' => $updated . ' risk(s) rejected.']);
     }
 
-    public function dueReviews()
+    public function dueReviews(Request $request)
     {
+        $user = $request->user();
+        if (!$user) return response()->json([]);
+
+        $viewerOnlyRoles = ['audit', 'human_resources'];
+        $userRoles = DB::table('user_roles')
+            ->join('roles', 'user_roles.role_id', '=', 'roles.role_id')
+            ->where('user_roles.user_id', $user->id)
+            ->pluck('roles.name')
+            ->toArray();
+
+        $isViewerOnly = !empty($userRoles) && count(array_diff($userRoles, $viewerOnlyRoles)) === 0;
+        if ($isViewerOnly) return response()->json([]);
+
+        $isSysAdmin = in_array('sys_admin', $userRoles) || in_array('director', $userRoles) || in_array('risk_admin', $userRoles);
+
         $cutoff = now()->addDays(20)->toDateString();
         $today  = now()->toDateString();
 
-        $risks = Risk::whereIn('status', ['Open', 'In Progress'])
+        $query = Risk::whereIn('status', ['Open', 'In Progress'])
             ->whereNotNull('resolved_by')
             ->whereBetween('resolved_by', [$today, $cutoff])
             ->select('id', 'sn', 'risk_description', 'owner', 'department_id', 'resolved_by', 'status')
-            ->orderBy('resolved_by')
-            ->get();
+            ->orderBy('resolved_by');
 
-        return response()->json($risks);
+        if (!$isSysAdmin && !empty($user->department_id)) {
+            $query->where('department_id', $user->department_id);
+        }
+
+        return response()->json($query->get());
     }
 
     public function getMetadata()
