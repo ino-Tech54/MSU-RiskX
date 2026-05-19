@@ -27,6 +27,20 @@ class ReportsController extends Controller
         return count(array_intersect($roles, $adminRoles)) > 0;
     }
 
+    private function isSheOfficer($request): bool
+    {
+        $user = $request->user();
+        if (!$user) return false;
+        $roles = DB::table('user_roles')
+            ->join('roles', 'user_roles.role_id', '=', 'roles.role_id')
+            ->where('user_roles.user_id', $user->user_id)
+            ->pluck('roles.name')
+            ->map(fn($r) => strtolower(trim($r)))
+            ->toArray();
+        $sheRoles = ['she', 'she officer', 'safety officer', 'she admin', 'she compliance'];
+        return count(array_intersect($roles, $sheRoles)) > 0;
+    }
+
     private function userDeptId($request): ?string
     {
         $user = $request->user();
@@ -128,7 +142,8 @@ class ReportsController extends Controller
 
         $query = SheEvent::orderBy('created_at', 'DESC');
 
-        if (!$this->isAdminUser($request) && $dept = $this->userDeptId($request)) {
+        $isAdminOrShe = $this->isAdminUser($request) || $this->isSheOfficer($request);
+        if (!$isAdminOrShe && $dept = $this->userDeptId($request)) {
             $query->where('department_id', $dept);
         } elseif ($request->filled('department')) {
             $query->where('department', $request->department);
