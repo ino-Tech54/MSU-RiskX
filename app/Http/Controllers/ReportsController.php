@@ -33,6 +33,14 @@ class ReportsController extends Controller
         return $user->department_id ?? null;
     }
 
+    private function userDeptName($request): ?string
+    {
+        $deptId = $this->userDeptId($request);
+        if (!$deptId) return null;
+        $dept = DB::table('departments')->where('department_id', $deptId)->first();
+        return $dept->department_name ?? null;
+    }
+
     public function summary(Request $request)
     {
         $this->authorizeModule($request, 'Analysis & Reports', 'view');
@@ -120,8 +128,8 @@ class ReportsController extends Controller
 
         $query = SheEvent::orderBy('created_at', 'DESC');
 
-        if (!$this->isAdminUser($request) && $dept = $this->userDeptId($request)) {
-            $query->where('department', $dept);
+        if (!$this->isAdminUser($request) && $deptName = $this->userDeptName($request)) {
+            $query->where('department', $deptName);
         } elseif ($request->filled('department')) {
             $query->where('department', $request->department);
         }
