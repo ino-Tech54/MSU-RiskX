@@ -303,7 +303,7 @@ class RiskController extends Controller
         $viewerOnlyRoles = ['audit', 'human_resources'];
         $userRoles = DB::table('user_roles')
             ->join('roles', 'user_roles.role_id', '=', 'roles.role_id')
-            ->where('user_roles.user_id', $user->id)
+            ->where('user_roles.user_id', $user->user_id)
             ->pluck('roles.name')
             ->toArray();
 
