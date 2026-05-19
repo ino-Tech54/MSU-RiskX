@@ -128,8 +128,8 @@ class ReportsController extends Controller
 
         $query = SheEvent::orderBy('created_at', 'DESC');
 
-        if (!$this->isAdminUser($request) && $deptName = $this->userDeptName($request)) {
-            $query->where('department', $deptName);
+        if (!$this->isAdminUser($request) && $dept = $this->userDeptId($request)) {
+            $query->where('department_id', $dept);
         } elseif ($request->filled('department')) {
             $query->where('department', $request->department);
         }

@@ -13,7 +13,7 @@ class SheEvent extends Model
     protected $primaryKey = 'id';
 
     protected $fillable = [
-        'action_id', 'date', 'activity_category', 'location', 'department', 
+        'action_id', 'date', 'activity_category', 'location', 'department', 'department_id',
         'staff_group', 'description', 'reference_id', 'observations', 
         'recommendations', 'priority', 'owner', 'quarter', 'status', 
         'evidence', 'verification', 'comments'

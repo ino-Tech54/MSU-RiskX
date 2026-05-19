@@ -54,8 +54,8 @@ class SheController extends Controller
     {
         $categories = SheEvent::whereNotNull('activity_category')->where('activity_category', '!=', '')->distinct()->pluck('activity_category');
         $locations = SheEvent::whereNotNull('location')->where('location', '!=', '')->distinct()->pluck('location');
-        $departments = SheEvent::whereNotNull('department')->where('department', '!=', '')->distinct()->pluck('department');
-        
+        $departments = DB::table('departments')->select('department_id', 'department_name')->orderBy('department_name')->get();
+
         $currentYear = date('Y');
         $count = SheEvent::where('action_id', 'LIKE', "$currentYear-SHE-%")->count();
         $nextId = sprintf("%s-SHE-%03d", $currentYear, $count + 1);
