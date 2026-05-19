@@ -13,6 +13,26 @@ use Illuminate\Support\Facades\Schema;
 
 class ReportsController extends Controller
 {
+    private function isAdminUser($request): bool
+    {
+        $user = $request->user();
+        if (!$user) return false;
+        $roles = DB::table('user_roles')
+            ->join('roles', 'user_roles.role_id', '=', 'roles.role_id')
+            ->where('user_roles.user_id', $user->id)
+            ->pluck('roles.name')
+            ->map(fn($r) => strtolower(trim($r)))
+            ->toArray();
+        $adminRoles = ['system admin', 'admin', 'administrator', 'sys_admin', 'director', 'risk_admin'];
+        return count(array_intersect($roles, $adminRoles)) > 0;
+    }
+
+    private function userDeptId($request): ?string
+    {
+        $user = $request->user();
+        return $user->department_id ?? null;
+    }
+
     public function summary(Request $request)
     {
         $this->authorizeModule($request, 'Analysis & Reports', 'view');
@@ -79,7 +99,9 @@ class ReportsController extends Controller
 
         $query = Risk::with('controls')->orderBy('created_at', 'DESC');
 
-        if ($request->filled('department_id')) {
+        if (!$this->isAdminUser($request) && $dept = $this->userDeptId($request)) {
+            $query->where('department_id', $dept);
+        } elseif ($request->filled('department_id')) {
             $query->where('department_id', $request->department_id);
         }
         if ($request->filled('from')) {
@@ -98,7 +120,9 @@ class ReportsController extends Controller
 
         $query = SheEvent::orderBy('created_at', 'DESC');
 
-        if ($request->filled('department')) {
+        if (!$this->isAdminUser($request) && $dept = $this->userDeptId($request)) {
+            $query->where('department', $dept);
+        } elseif ($request->filled('department')) {
             $query->where('department', $request->department);
         }
         if ($request->filled('from')) {
@@ -122,7 +146,9 @@ class ReportsController extends Controller
         $query = LossEvent::with(['risk:id,sn,risk_description', 'sheEvent:id,action_id,activity_category'])
             ->orderBy('created_at', 'DESC');
 
-        if ($request->filled('department_id')) {
+        if (!$this->isAdminUser($request) && $dept = $this->userDeptId($request)) {
+            $query->where('department_id', $dept);
+        } elseif ($request->filled('department_id')) {
             $query->where('department_id', $request->department_id);
         }
         if ($request->filled('from')) {
@@ -146,7 +172,9 @@ class ReportsController extends Controller
         $query = BcmPlan::with(['risk:id,sn,risk_description', 'owner:user_id,first_name,last_name'])
             ->orderBy('created_at', 'DESC');
 
-        if ($request->filled('department_id')) {
+        if (!$this->isAdminUser($request) && $dept = $this->userDeptId($request)) {
+            $query->where('department_id', $dept);
+        } elseif ($request->filled('department_id')) {
             $query->where('department_id', $request->department_id);
         }
         if ($request->filled('from')) {
