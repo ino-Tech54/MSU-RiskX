@@ -31,6 +31,8 @@ class ReportsController extends Controller
     {
         $user = $request->user();
         if (!$user) return false;
+
+        // Check roles first
         $roles = DB::table('user_roles')
             ->join('roles', 'user_roles.role_id', '=', 'roles.role_id')
             ->where('user_roles.user_id', $user->user_id)
@@ -38,7 +40,16 @@ class ReportsController extends Controller
             ->map(fn($r) => strtolower(trim($r)))
             ->toArray();
         $sheRoles = ['she', 'she officer', 'safety officer', 'she admin', 'she compliance'];
-        return count(array_intersect($roles, $sheRoles)) > 0;
+        if (count(array_intersect($roles, $sheRoles)) > 0) return true;
+
+        // Fallback: check if user's department is the SHE department
+        $sheDept = DB::table('departments')
+            ->where(function($q) {
+                $q->whereRaw("LOWER(department_name) LIKE '%she%'")
+                  ->orWhereRaw("LOWER(department_code) LIKE '%she%'");
+            })
+            ->first();
+        return $sheDept && $user->department_id === $sheDept->department_id;
     }
 
     private function userDeptId($request): ?string
