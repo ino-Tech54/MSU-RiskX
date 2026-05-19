@@ -143,44 +143,82 @@ class RiskController extends Controller
     {
         $request->validate(['file' => 'required|file|mimes:csv,txt']);
 
-        $file = $request->file('file');
+        $file   = $request->file('file');
         $handle = fopen($file->getRealPath(), 'r');
 
-        $headers = array_map('trim', fgetcsv($handle));
-        $expectedHeaders = ['risk_description', 'category', 'department_id', 'owner'];
-        foreach ($expectedHeaders as $h) {
+        $rawHeaders = fgetcsv($handle);
+        if (!$rawHeaders) {
+            fclose($handle);
+            return response()->json(['error' => 'File is empty or unreadable.'], 422);
+        }
+        $headers = array_map('trim', $rawHeaders);
+
+        $requiredColumns = ['risk_description', 'category', 'department_id', 'owner'];
+        foreach ($requiredColumns as $h) {
             if (!in_array($h, $headers)) {
                 fclose($handle);
-                return response()->json(['error' => "Missing required column: $h"], 422);
+                return response()->json(['error' => "Missing required column: \"$h\". Please use the provided template."], 422);
             }
         }
+
+        $validLikelihoods  = ['RARE', 'UNLIKELY', 'POSSIBLE', 'LIKELY', 'ALMOST CERTAIN'];
+        $validConsequences = ['INSIGNIFICANT', 'MINOR', 'MODERATE', 'MAJOR', 'CATASTROPHIC'];
+        $validStatuses     = ['Open', 'In Progress', 'Closed', 'Resolved'];
+        $likelihoodMap     = ['RARE' => 1, 'UNLIKELY' => 2, 'POSSIBLE' => 3, 'LIKELY' => 4, 'ALMOST CERTAIN' => 5];
+        $consequenceMap    = ['INSIGNIFICANT' => 1, 'MINOR' => 2, 'MODERATE' => 3, 'MAJOR' => 4, 'CATASTROPHIC' => 5];
 
         $imported = 0;
         $skipped  = 0;
         $errors   = [];
+        $rowNum   = 1;
 
         while (($row = fgetcsv($handle)) !== false) {
-            if (count($row) !== count($headers)) { $skipped++; continue; }
-            $data = array_combine($headers, array_map('trim', $row));
+            $rowNum++;
+            $row = array_map('trim', $row);
 
-            if (empty($data['risk_description']) || empty($data['category']) || empty($data['department_id']) || empty($data['owner'])) {
+            if (count($row) < count($headers)) {
+                $row = array_pad($row, count($headers), '');
+            }
+            $data = array_combine($headers, $row);
+
+            $rowLabel = "Row $rowNum" . (!empty($data['risk_description']) ? " ({$data['risk_description']})" : '');
+            $rowErrors = [];
+
+            if (empty($data['risk_description'])) $rowErrors[] = 'Risk Description is required';
+            if (empty($data['category']))         $rowErrors[] = 'Category is required';
+            if (empty($data['department_id']))    $rowErrors[] = 'Department is required';
+            if (empty($data['owner']))            $rowErrors[] = 'Owner is required';
+
+            $iL = strtoupper($data['inherent_likelihood'] ?? '');
+            $iC = strtoupper($data['inherent_consequence'] ?? '');
+            $rL = strtoupper($data['residual_likelihood'] ?? '');
+            $rC = strtoupper($data['residual_consequence'] ?? '');
+
+            if ($iL && !in_array($iL, $validLikelihoods))  $rowErrors[] = "Invalid Inherent Likelihood \"$iL\" (use: " . implode(', ', $validLikelihoods) . ')';
+            if ($iC && !in_array($iC, $validConsequences)) $rowErrors[] = "Invalid Inherent Consequence \"$iC\" (use: " . implode(', ', $validConsequences) . ')';
+            if ($rL && !in_array($rL, $validLikelihoods))  $rowErrors[] = "Invalid Residual Likelihood \"$rL\"";
+            if ($rC && !in_array($rC, $validConsequences)) $rowErrors[] = "Invalid Residual Consequence \"$rC\"";
+
+            $status = $data['status'] ?? 'Open';
+            if (!in_array($status, $validStatuses)) $status = 'Open';
+
+            if (!empty($rowErrors)) {
                 $skipped++;
-                $errors[] = "Row skipped (missing required fields): " . ($data['risk_description'] ?? '(empty)');
+                foreach ($rowErrors as $e) {
+                    $errors[] = "$rowLabel: $e";
+                }
                 continue;
             }
 
+            $iL = $iL ?: 'POSSIBLE';
+            $iC = $iC ?: 'MODERATE';
+            $rL = $rL ?: 'UNLIKELY';
+            $rC = $rC ?: 'MODERATE';
+
             try {
-                $likelihoodMap = ['RARE' => 1, 'UNLIKELY' => 2, 'POSSIBLE' => 3, 'LIKELY' => 4, 'ALMOST CERTAIN' => 5];
-                $consequenceMap = ['INSIGNIFICANT' => 1, 'MINOR' => 2, 'MODERATE' => 3, 'MAJOR' => 4, 'CATASTROPHIC' => 5];
-
-                $iL = strtoupper(trim($data['inherent_likelihood'] ?? 'POSSIBLE'));
-                $iC = strtoupper(trim($data['inherent_consequence'] ?? 'MODERATE'));
-                $rL = strtoupper(trim($data['residual_likelihood'] ?? 'UNLIKELY'));
-                $rC = strtoupper(trim($data['residual_consequence'] ?? 'MODERATE'));
-
                 Risk::create([
                     'sn'                       => $this->nextRiskId($data['department_id']),
-                    'date_reviewed'            => $data['date_reviewed'] ?? now()->toDateString(),
+                    'date_reviewed'            => !empty($data['date_reviewed']) ? $data['date_reviewed'] : now()->toDateString(),
                     'risk_description'         => $data['risk_description'],
                     'category'                 => $data['category'],
                     'department_id'            => $data['department_id'],
@@ -190,17 +228,17 @@ class RiskController extends Controller
                     'consequence'              => $data['consequence'] ?? null,
                     'inherent_likelihood'      => $iL,
                     'inherent_consequence'     => $iC,
-                    'inherent_risk_score'      => ($likelihoodMap[$iL] ?? 3) * ($consequenceMap[$iC] ?? 3),
+                    'inherent_risk_score'      => $likelihoodMap[$iL] * $consequenceMap[$iC],
                     'existing_controls'        => $data['existing_controls'] ?? null,
                     'control_effectiveness'    => $data['control_effectiveness'] ?? 'Moderate',
                     'residual_likelihood'      => $rL,
                     'residual_consequence'     => $rC,
-                    'residual_risk_score'      => ($likelihoodMap[$rL] ?? 2) * ($consequenceMap[$rC] ?? 3),
+                    'residual_risk_score'      => $likelihoodMap[$rL] * $consequenceMap[$rC],
                     'mitigation_strategy'      => $data['mitigation_strategy'] ?? 'Reduce',
                     'action_treatment'         => $data['action_treatment'] ?? null,
                     'method'                   => $data['method'] ?? 'Risk Monitoring',
-                    'resolved_by'              => $data['resolved_by'] ?? null,
-                    'status'                   => $data['status'] ?? 'Open',
+                    'resolved_by'              => !empty($data['resolved_by']) ? $data['resolved_by'] : null,
+                    'status'                   => $status,
                     'likelihood_justification' => $data['likelihood_justification'] ?? null,
                     'consequence_justification'=> $data['consequence_justification'] ?? null,
                     'approval_status'          => 'pending',
@@ -208,7 +246,7 @@ class RiskController extends Controller
                 $imported++;
             } catch (\Exception $e) {
                 $skipped++;
-                $errors[] = "Row failed (" . ($data['risk_description'] ?? '') . "): " . $e->getMessage();
+                $errors[] = "$rowLabel: " . $e->getMessage();
             }
         }
 

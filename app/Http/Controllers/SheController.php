@@ -75,37 +75,69 @@ class SheController extends Controller
         $file   = $request->file('file');
         $handle = fopen($file->getRealPath(), 'r');
 
-        $headers = array_map('trim', fgetcsv($handle));
-        $required = ['description', 'activity_category', 'department', 'owner'];
-        foreach ($required as $h) {
+        $rawHeaders = fgetcsv($handle);
+        if (!$rawHeaders) {
+            fclose($handle);
+            return response()->json(['error' => 'File is empty or unreadable.'], 422);
+        }
+        $headers = array_map('trim', $rawHeaders);
+
+        $requiredColumns = ['description', 'activity_category', 'department'];
+        foreach ($requiredColumns as $h) {
             if (!in_array($h, $headers)) {
                 fclose($handle);
-                return response()->json(['error' => "Missing required column: $h"], 422);
+                return response()->json(['error' => "Missing required column: \"$h\". Please use the provided template."], 422);
             }
         }
+
+        $validPriorities = ['Low', 'Medium', 'High', 'Critical'];
+        $validStatuses   = ['Open', 'In Progress', 'Closed', 'Resolved'];
 
         $imported = 0;
         $skipped  = 0;
         $errors   = [];
+        $rowNum   = 1;
 
         while (($row = fgetcsv($handle)) !== false) {
-            if (count($row) !== count($headers)) { $skipped++; continue; }
-            $data = array_combine($headers, array_map('trim', $row));
+            $rowNum++;
+            $row = array_map('trim', $row);
 
-            if (empty($data['description']) || empty($data['activity_category']) || empty($data['department']) || empty($data['owner'])) {
+            if (count($row) < count($headers)) {
+                $row = array_pad($row, count($headers), '');
+            }
+            $data = array_combine($headers, $row);
+
+            $rowLabel  = "Row $rowNum" . (!empty($data['description']) ? " ({$data['description']})" : '');
+            $rowErrors = [];
+
+            if (empty($data['description']))       $rowErrors[] = 'Description is required';
+            if (empty($data['activity_category'])) $rowErrors[] = 'Activity Category is required';
+            if (empty($data['department']))        $rowErrors[] = 'Department is required';
+
+            $priority = $data['priority'] ?? 'Medium';
+            if (!in_array($priority, $validPriorities)) {
+                $rowErrors[] = "Invalid Priority \"$priority\" (use: " . implode(', ', $validPriorities) . ')';
+            }
+
+            $status = $data['status'] ?? 'Open';
+            if (!in_array($status, $validStatuses)) $status = 'Open';
+
+            if (!empty($rowErrors)) {
                 $skipped++;
-                $errors[] = "Row skipped (missing required fields): " . ($data['description'] ?? '(empty)');
+                foreach ($rowErrors as $e) {
+                    $errors[] = "$rowLabel: $e";
+                }
                 continue;
             }
 
             try {
                 $currentYear = date('Y');
-                $count = SheEvent::where('action_id', 'LIKE', "$currentYear-SHE-%")->count();
-                $actionId = $data['action_id'] ?? sprintf('%s-SHE-%03d', $currentYear, $count + 1);
+                $count    = SheEvent::where('action_id', 'LIKE', "$currentYear-SHE-%")->count();
+                $actionId = sprintf('%s-SHE-%03d', $currentYear, $count + 1);
 
                 SheEvent::create([
                     'action_id'         => $actionId,
-                    'date'              => $data['date'] ?? now()->toDateString(),
+                    'date'              => !empty($data['date']) ? $data['date'] : now()->toDateString(),
                     'quarter'           => $data['quarter'] ?? null,
                     'location'          => $data['location'] ?? null,
                     'department'        => $data['department'],
@@ -115,16 +147,16 @@ class SheController extends Controller
                     'description'       => $data['description'],
                     'observations'      => $data['observations'] ?? null,
                     'recommendations'   => $data['recommendations'] ?? null,
-                    'priority'          => $data['priority'] ?? 'Medium',
-                    'owner'             => $data['owner'],
-                    'status'            => $data['status'] ?? 'Open',
+                    'priority'          => $priority,
+                    'owner'             => $data['owner'] ?? null,
+                    'status'            => $status,
                     'verification'      => $data['verification'] ?? null,
                     'comments'          => $data['comments'] ?? null,
                 ]);
                 $imported++;
             } catch (\Exception $e) {
                 $skipped++;
-                $errors[] = "Row failed (" . ($data['description'] ?? '') . "): " . $e->getMessage();
+                $errors[] = "$rowLabel: " . $e->getMessage();
             }
         }
 
