@@ -51,8 +51,17 @@ class Controller extends BaseController
         }
 
         // Sys Admins have full access to everything
-        $roles = $user->roles ?? [];
-        if (in_array('sys_admin', $roles) || in_array('System Administrator', $roles)) {
+        $roleIds = DB::table('user_roles')
+            ->where('user_id', $user->user_id)
+            ->pluck('role_id')
+            ->toArray();
+
+        $roleNames = DB::table('roles')
+            ->whereIn('role_id', $roleIds)
+            ->pluck('role_name')
+            ->toArray();
+
+        if (in_array('sys_admin', $roleNames) || in_array('System Administrator', $roleNames)) {
             return true;
         }
 
@@ -66,11 +75,6 @@ class Controller extends BaseController
             'approve' => 'can_approve',
         ];
         $field = $fieldMap[strtolower($action)] ?? 'can_view';
-
-        $roleIds = DB::table('user_roles')
-            ->where('user_id', $user->user_id)
-            ->pluck('role_id')
-            ->toArray();
 
         $entityIds = array_merge([$user->user_id], $roleIds);
 
