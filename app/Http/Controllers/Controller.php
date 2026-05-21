@@ -50,6 +50,12 @@ class Controller extends BaseController
             return false;
         }
 
+        // Sys Admins have full access to everything
+        $roles = $user->roles ?? [];
+        if (in_array('sys_admin', $roles) || in_array('System Administrator', $roles)) {
+            return true;
+        }
+
         $fieldMap = [
             'view'    => 'can_view',
             'add'     => 'can_add',
