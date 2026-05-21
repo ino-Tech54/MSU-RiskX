@@ -72,6 +72,7 @@ Route::post('/monte-carlo/simulate', [App\Http\Controllers\MonteCarloController:
 Route::prefix('loss-events')->group(function () {
     Route::get('/', [LossEventController::class, 'index']);
     Route::post('/', [LossEventController::class, 'store']);
+    Route::post('/import', [LossEventController::class, 'import']);
     Route::put('/{id}', [LossEventController::class, 'update']);
     Route::delete('/{id}', [LossEventController::class, 'destroy']);
 });

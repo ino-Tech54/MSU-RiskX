@@ -17,6 +17,7 @@ class LossEvent extends Model
     protected $fillable = [
         'loss_id',
         'loss_reference',
+        'record_type',
         'risk_id',
         'she_event_id',
         'department_id',
@@ -29,6 +30,20 @@ class LossEvent extends Model
         'root_cause',
         'status',
         'evidence',
+        'case_number',
+        'priority_level',
+        'complainant',
+        'accused_person',
+        'time_of_occurrence',
+        'case_against',
+        'police_ref',
+        'case_category',
+        'location',
+        'property_involved',
+        'estimate_value',
+        'corrective_action',
+        'action_owner',
+        'quarter',
     ];
 
     protected $casts = [
