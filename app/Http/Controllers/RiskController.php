@@ -167,6 +167,13 @@ class RiskController extends Controller
         $likelihoodMap     = ['RARE' => 1, 'UNLIKELY' => 2, 'POSSIBLE' => 3, 'LIKELY' => 4, 'ALMOST CERTAIN' => 5];
         $consequenceMap    = ['INSIGNIFICANT' => 1, 'MINOR' => 2, 'MODERATE' => 3, 'MAJOR' => 4, 'CATASTROPHIC' => 5];
 
+        // Build department name → id lookup
+        $departments = DB::table('departments')->get(['department_id', 'department_name']);
+        $deptLookup = [];
+        foreach ($departments as $d) {
+            $deptLookup[strtolower(trim($d->department_name))] = $d->department_id;
+        }
+
         $imported = 0;
         $skipped  = 0;
         $errors   = [];
@@ -215,13 +222,21 @@ class RiskController extends Controller
             $rL = $rL ?: 'UNLIKELY';
             $rC = $rC ?: 'MODERATE';
 
+            // Resolve department name to ID
+            $deptId = $this->resolveDepartmentId($data['department_id'], $deptLookup);
+            if (!$deptId) {
+                $skipped++;
+                $errors[] = "$rowLabel: Department not found";
+                continue;
+            }
+
             try {
                 Risk::create([
-                    'sn'                       => $this->nextRiskId($data['department_id']),
+                    'sn'                       => $this->nextRiskId($deptId),
                     'date_reviewed'            => !empty($data['date_reviewed']) ? $data['date_reviewed'] : now()->toDateString(),
                     'risk_description'         => $data['risk_description'],
                     'category'                 => $data['category'],
-                    'department_id'            => $data['department_id'],
+                    'department_id'            => $deptId,
                     'owner'                    => $data['owner'],
                     'kra_at_risk'              => $data['kra_at_risk'] ?? null,
                     'causes'                   => $data['causes'] ?? null,
@@ -411,5 +426,34 @@ class RiskController extends Controller
     {
         $code = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $code));
         return $code !== '' ? substr($code, 0, 8) : 'GEN';
+    }
+
+    private function resolveDepartmentId(?string $name, array $lookup): ?string
+    {
+        if (!$name) return null;
+        // If it's already a valid UUID-like ID, return it
+        if (preg_match('/^[0-9a-f-]{36}$/i', $name)) {
+            return $name;
+        }
+        $key = strtolower(trim($name));
+        // Exact match
+        if (isset($lookup[$key])) return $lookup[$key];
+        // Partial / fuzzy match
+        foreach ($lookup as $deptName => $deptId) {
+            if (str_contains($deptName, $key) || str_contains($key, $deptName)) {
+                return $deptId;
+            }
+        }
+        // Try comma-separated parts
+        $parts = array_map('trim', explode(',', $key));
+        foreach ($parts as $part) {
+            if (isset($lookup[$part])) return $lookup[$part];
+            foreach ($lookup as $deptName => $deptId) {
+                if (str_contains($deptName, $part) || str_contains($part, $deptName)) {
+                    return $deptId;
+                }
+            }
+        }
+        return null;
     }
 }

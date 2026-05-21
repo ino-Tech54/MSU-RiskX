@@ -48,7 +48,13 @@ class LossEventController extends Controller
                 'priority_level' => 'nullable|string|in:Low,Medium,High,Extreme',
                 'complainant' => 'nullable|string|max:255',
                 'accused_person' => 'nullable|string|max:255',
-                'time_of_occurrence' => 'nullable|string|max:20',
+                'time_of_occurrence' => ['nullable', 'string', 'max:20', function ($attribute, $value, $fail) {
+                    if (!$value) return;
+                    // Accept H:i (24h) or h:i A (12h with AM/PM)
+                    if (!preg_match('/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM|am|pm)?$/', trim($value), $m)) {
+                        return $fail('The time must be in format HH:MM or HH:MM AM/PM.');
+                    }
+                }],
                 'case_against' => 'nullable|string|max:50',
                 'police_ref' => 'nullable|string|max:50',
                 'case_category' => 'nullable|string|max:100',
@@ -111,7 +117,13 @@ class LossEventController extends Controller
                 'priority_level' => 'nullable|string|in:Low,Medium,High,Extreme',
                 'complainant' => 'nullable|string|max:255',
                 'accused_person' => 'nullable|string|max:255',
-                'time_of_occurrence' => 'nullable|string|max:20',
+                'time_of_occurrence' => ['nullable', 'string', 'max:20', function ($attribute, $value, $fail) {
+                    if (!$value) return;
+                    // Accept H:i (24h) or h:i A (12h with AM/PM)
+                    if (!preg_match('/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM|am|pm)?$/', trim($value), $m)) {
+                        return $fail('The time must be in format HH:MM or HH:MM AM/PM.');
+                    }
+                }],
                 'case_against' => 'nullable|string|max:50',
                 'police_ref' => 'nullable|string|max:50',
                 'case_category' => 'nullable|string|max:100',

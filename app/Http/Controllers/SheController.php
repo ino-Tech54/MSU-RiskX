@@ -93,6 +93,18 @@ class SheController extends Controller
         $validPriorities = ['Low', 'Medium', 'High', 'Critical'];
         $validStatuses   = ['Open', 'In Progress', 'Closed', 'Resolved'];
 
+        // Build department name → id lookup
+        $departments = DB::table('departments')->get(['department_id', 'department_name']);
+        $deptLookup = [];
+        foreach ($departments as $d) {
+            $deptLookup[strtolower(trim($d->department_name))] = $d->department_id;
+        }
+        // Also build id → name for reverse lookup
+        $deptIdToName = [];
+        foreach ($departments as $d) {
+            $deptIdToName[$d->department_id] = $d->department_name;
+        }
+
         $imported = 0;
         $skipped  = 0;
         $errors   = [];
@@ -130,6 +142,10 @@ class SheController extends Controller
                 continue;
             }
 
+            // Resolve department name to ID
+            $deptId = $this->resolveDepartmentId($data['department'], $deptLookup);
+            $deptName = $deptId ? ($deptIdToName[$deptId] ?? $data['department']) : $data['department'];
+
             try {
                 $currentYear = date('Y');
                 $count    = SheEvent::where('action_id', 'LIKE', "$currentYear-SHE-%")->count();
@@ -140,7 +156,8 @@ class SheController extends Controller
                     'date'              => !empty($data['date']) ? $data['date'] : now()->toDateString(),
                     'quarter'           => $data['quarter'] ?? null,
                     'location'          => $data['location'] ?? null,
-                    'department'        => $data['department'],
+                    'department'        => $deptName,
+                    'department_id'     => $deptId,
                     'staff_group'       => $data['staff_group'] ?? null,
                     'activity_category' => $data['activity_category'],
                     'reference_id'      => $data['reference_id'] ?? null,
@@ -173,5 +190,34 @@ class SheController extends Controller
         $event->delete();
         $this->logActivity(request(), 'SHE Record Deleted', 'Deleted SHE record ' . $actionId . ': ' . $description);
         return response()->json(['message' => 'SHE record deleted successfully']);
+    }
+
+    private function resolveDepartmentId(?string $name, array $lookup): ?string
+    {
+        if (!$name) return null;
+        // If it's already a valid UUID-like ID, return it
+        if (preg_match('/^[0-9a-f-]{36}$/i', $name)) {
+            return $name;
+        }
+        $key = strtolower(trim($name));
+        // Exact match
+        if (isset($lookup[$key])) return $lookup[$key];
+        // Partial / fuzzy match
+        foreach ($lookup as $deptName => $deptId) {
+            if (str_contains($deptName, $key) || str_contains($key, $deptName)) {
+                return $deptId;
+            }
+        }
+        // Try comma-separated parts
+        $parts = array_map('trim', explode(',', $key));
+        foreach ($parts as $part) {
+            if (isset($lookup[$part])) return $lookup[$part];
+            foreach ($lookup as $deptName => $deptId) {
+                if (str_contains($deptName, $part) || str_contains($part, $deptName)) {
+                    return $deptId;
+                }
+            }
+        }
+        return null;
     }
 }
