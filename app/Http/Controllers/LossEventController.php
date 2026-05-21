@@ -200,6 +200,13 @@ class LossEventController extends Controller
             'status' => $this->findColumn($headers, ['status']),
         ];
 
+        // Build department name → id lookup
+        $departments = DB::table('departments')->get(['department_id', 'department_name']);
+        $deptLookup = [];
+        foreach ($departments as $d) {
+            $deptLookup[strtolower(trim($d->department_name))] = $d->department_id;
+        }
+
         $imported = 0;
         $skipped = 0;
         $userId = $request->user()->user_id ?? null;
@@ -270,7 +277,7 @@ class LossEventController extends Controller
                 'police_ref' => $this->getCell($row, $map['police_ref']),
                 'event_title' => $eventTitle,
                 'description' => $desc,
-                'department_id' => $this->getCell($row, $map['department_id']),
+                'department_id' => $this->resolveDepartment($this->getCell($row, $map['department_id']), $deptLookup),
                 'case_category' => $this->getCell($row, $map['case_category']),
                 'location' => $this->getCell($row, $map['location']),
                 'property_involved' => $this->getCell($row, $map['property_involved']),
@@ -313,6 +320,31 @@ class LossEventController extends Controller
         if ($index === null || !isset($row[$index])) return null;
         $val = trim((string) $row[$index]);
         return $val === '' ? null : $val;
+    }
+
+    private function resolveDepartment(?string $name, array $lookup): ?string
+    {
+        if (!$name) return null;
+        $key = strtolower(trim($name));
+        // Exact match
+        if (isset($lookup[$key])) return $lookup[$key];
+        // Partial / fuzzy match: check if any department name contains the input or vice-versa
+        foreach ($lookup as $deptName => $deptId) {
+            if (str_contains($deptName, $key) || str_contains($key, $deptName)) {
+                return $deptId;
+            }
+        }
+        // Try matching on individual parts separated by comma
+        $parts = array_map('trim', explode(',', $key));
+        foreach ($parts as $part) {
+            if (isset($lookup[$part])) return $lookup[$part];
+            foreach ($lookup as $deptName => $deptId) {
+                if (str_contains($deptName, $part) || str_contains($part, $deptName)) {
+                    return $deptId;
+                }
+            }
+        }
+        return null;
     }
 
     private function normalizePriority(?string $value): ?string
