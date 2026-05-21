@@ -56,12 +56,15 @@ class Controller extends BaseController
             ->pluck('role_id')
             ->toArray();
 
-        $roleNames = DB::table('roles')
+        $roleData = DB::table('roles')
             ->whereIn('role_id', $roleIds)
-            ->pluck('role_name')
-            ->toArray();
+            ->select('name', 'display_name')
+            ->get();
 
-        if (in_array('sys_admin', $roleNames) || in_array('System Administrator', $roleNames)) {
+        $roleNames = $roleData->pluck('name')->toArray();
+        $displayNames = $roleData->pluck('display_name')->toArray();
+
+        if (in_array('sys_admin', $roleNames) || in_array('System Administrator', $displayNames)) {
             return true;
         }
 
