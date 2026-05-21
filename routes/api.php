@@ -8,6 +8,7 @@ use App\Http\Controllers\SheController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LossEventController;
 use App\Http\Controllers\BcmController;
+use App\Http\Controllers\InsuranceClaimController;
 use App\Http\Controllers\ReportsController;
 
 use App\Http\Controllers\AdminController;

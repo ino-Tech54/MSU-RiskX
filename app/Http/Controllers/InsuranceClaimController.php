@@ -220,7 +220,31 @@ class InsuranceClaimController extends Controller
             return response()->json(['message' => 'File is empty or has no data rows.'], 422);
         }
 
-        $headers = array_map(fn($h) => strtolower(trim($h ?? '')), $rows[0]);
+        // Map friendly headers to database fields
+        $headerMap = [
+            'date claim received' => 'date_received',
+            'claim' => 'claim_description',
+            'quotation 1' => 'quotation_1',
+            'quotation 2' => 'quotation_2',
+            'quotation 3' => 'quotation_3',
+            'police technical report' => 'police_report',
+            'police/ technical report' => 'police_report',
+            'driver licence' => 'drivers_licence',
+            'driver\'s licence' => 'drivers_licence',
+            'pictures' => 'pictures',
+            'release form' => 'release_form',
+            'status' => 'status',
+            'pop' => 'pop',
+            'department' => 'department',
+            'claimant name' => 'claimant_name',
+            'claim value' => 'claim_value',
+        ];
+
+        $rawHeaders = array_map(fn($h) => strtolower(trim($h ?? '')), $rows[0]);
+        $headers = [];
+        foreach ($rawHeaders as $idx => $raw) {
+            $headers[$idx] = $headerMap[$raw] ?? $raw;
+        }
         $dataRows = array_slice($rows, 1);
 
         // Build department lookup
@@ -241,7 +265,7 @@ class InsuranceClaimController extends Controller
                 continue;
             }
 
-            $claimDesc = $this->getCell($row, $headers, 'claim');
+            $claimDesc = $this->getCell($row, $headers, 'claim_description');
             if (!$claimDesc) {
                 $skipped++;
                 continue;
@@ -251,7 +275,7 @@ class InsuranceClaimController extends Controller
             $claimType = $this->detectClaimType($claimDesc);
 
             // Parse date
-            $dateReceived = $this->getCell($row, $headers, 'date claim received');
+            $dateReceived = $this->getCell($row, $headers, 'date_received');
             $parsedDate = null;
             if ($dateReceived) {
                 try {
@@ -267,6 +291,8 @@ class InsuranceClaimController extends Controller
 
             // Resolve department if provided
             $deptName = $this->getCell($row, $headers, 'department');
+            $claimantName = $this->getCell($row, $headers, 'claimant_name');
+            $claimValue = $this->getCell($row, $headers, 'claim_value');
             $deptId = $deptName ? $this->resolveDepartment($deptName, $deptLookup) : null;
 
             $record = [
@@ -275,16 +301,18 @@ class InsuranceClaimController extends Controller
                 'date_received' => $parsedDate,
                 'claim_type' => $claimType,
                 'claim_description' => $claimDesc,
-                'quotation_1' => $this->getCell($row, $headers, 'quotation 1'),
-                'quotation_2' => $this->getCell($row, $headers, 'quotation 2'),
-                'quotation_3' => $this->getCell($row, $headers, 'quotation 3'),
-                'police_report' => $this->normalizeYesNoNa($this->getCell($row, $headers, 'police/ technical report')),
-                'drivers_licence' => $this->normalizeYesNoNa($this->getCell($row, $headers, 'driver\'s licence')),
+                'quotation_1' => $this->getCell($row, $headers, 'quotation_1'),
+                'quotation_2' => $this->getCell($row, $headers, 'quotation_2'),
+                'quotation_3' => $this->getCell($row, $headers, 'quotation_3'),
+                'police_report' => $this->normalizeYesNoNa($this->getCell($row, $headers, 'police_report')),
+                'drivers_licence' => $this->normalizeYesNoNa($this->getCell($row, $headers, 'drivers_licence')),
                 'pictures' => $this->normalizeYesNo($this->getCell($row, $headers, 'pictures')),
-                'release_form' => $this->normalizeYesNo($this->getCell($row, $headers, 'release form')),
+                'release_form' => $this->normalizeYesNo($this->getCell($row, $headers, 'release_form')),
                 'status' => $this->normalizeStatus($this->getCell($row, $headers, 'status')),
                 'pop' => $this->normalizePop($this->getCell($row, $headers, 'pop')),
                 'department_id' => $deptId,
+                'claimant_name' => $claimantName,
+                'claim_value' => $claimValue ? (float) $claimValue : null,
                 'reported_by' => $userId,
             ];
 
@@ -323,7 +351,8 @@ class InsuranceClaimController extends Controller
 
     private function getCell(array $row, array $headers, string $key): ?string
     {
-        $index = array_search(strtolower($key), $headers);
+        // headers array is now already mapped, so find by key directly
+        $index = array_search($key, $headers);
         if ($index === false || !isset($row[$index])) return null;
         $val = trim((string) $row[$index]);
         return $val === '' ? null : $val;
