@@ -78,6 +78,18 @@ Route::prefix('loss-events')->group(function () {
 });
 Route::get('/loss-metadata', [LossEventController::class, 'metadata']);
 
+Route::prefix('insurance-claims')->group(function () {
+    Route::get('/', [InsuranceClaimController::class, 'index']);
+    Route::post('/', [InsuranceClaimController::class, 'store']);
+    Route::post('/import', [InsuranceClaimController::class, 'import']);
+    Route::get('/{id}', [InsuranceClaimController::class, 'show']);
+    Route::put('/{id}', [InsuranceClaimController::class, 'update']);
+    Route::delete('/{id}', [InsuranceClaimController::class, 'destroy']);
+    Route::post('/{id}/documents', [InsuranceClaimController::class, 'uploadDocument']);
+    Route::delete('/{id}/documents/{documentId}', [InsuranceClaimController::class, 'deleteDocument']);
+});
+Route::get('/insurance-metadata', [InsuranceClaimController::class, 'metadata']);
+
 Route::prefix('bcm-plans')->group(function () {
     Route::get('/', [BcmController::class, 'index']);
     Route::post('/', [BcmController::class, 'store']);
