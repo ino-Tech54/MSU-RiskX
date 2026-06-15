@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('she_accident_records', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->string('iod_number')->unique();
+            $table->string('iod_number', 100)->unique();
             $table->string('name_of_injured')->nullable();
             $table->string('day_of_week')->nullable();
             $table->date('date_of_injury')->nullable();

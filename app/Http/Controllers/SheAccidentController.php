@@ -11,7 +11,10 @@ class SheAccidentController extends Controller
 {
     public function index(Request $request)
     {
-        $this->authorizeModule($request, 'SHE Compliance', 'view');
+        if (!$this->hasModulePermission($request, 'SHE Compliance', 'view') &&
+            !$this->hasModulePermission($request, 'SHE Management', 'view')) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
         $records = SheAccidentRecord::orderBy('date_of_injury', 'desc')->get();
         return response()->json($records);
     }
