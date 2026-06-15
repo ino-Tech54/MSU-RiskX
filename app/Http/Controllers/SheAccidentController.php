@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\SheAccidentRecord;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class SheAccidentController extends Controller
 {
@@ -78,93 +77,105 @@ class SheAccidentController extends Controller
     {
         $this->authorizeModule($request, 'SHE Compliance', 'add');
 
-        if (!$request->hasFile('file')) {
-            return response()->json(['message' => 'No file provided'], 422);
-        }
+        $request->validate([
+            'file' => 'required|file|mimes:csv,txt,xlsx,xls|max:5120',
+        ]);
 
         $file = $request->file('file');
         $ext  = strtolower($file->getClientOriginalExtension());
 
         $headerMap = [
-            'i.o.d no'                    => 'iod_number',
-            'iod no'                      => 'iod_number',
-            'iod number'                  => 'iod_number',
-            'name of the injured'         => 'name_of_injured',
-            'day of the week'             => 'day_of_week',
-            'date of injury'              => 'date_of_injury',
-            'time of injury'              => 'time_of_injury',
-            'age'                         => 'age',
-            'designation'                 => 'designation',
-            'employment status'           => 'employment_status',
-            'nssa claim number'           => 'nssa_claim_number',
-            'description of events'       => 'description_of_events',
-            'department of injured'       => 'department',
-            'department'                  => 'department',
-            'manager /supervisor'         => 'manager_supervisor',
-            'manager/supervisor'          => 'manager_supervisor',
-            'manager supervisor'          => 'manager_supervisor',
-            'source of injury'            => 'source_of_injury',
-            'location /work area'         => 'location_work_area',
-            'location/work area'          => 'location_work_area',
-            'location work area'          => 'location_work_area',
-            'part of body injured'        => 'part_of_body_injured',
-            'nature of injury'            => 'nature_of_injury',
-            'days lost'                   => 'days_lost',
-            'medical treatment'           => 'medical_treatment',
-            'corrective action taken or recommended' => 'corrective_action',
-            'corrective action'           => 'corrective_action',
+            'i.o.d no'                               => 'iod_number',
+            'iod no'                                  => 'iod_number',
+            'iod number'                              => 'iod_number',
+            'name of the injured'                     => 'name_of_injured',
+            'day of the week'                         => 'day_of_week',
+            'date of injury'                          => 'date_of_injury',
+            'time of injury'                          => 'time_of_injury',
+            'age'                                     => 'age',
+            'designation'                             => 'designation',
+            'employment status'                       => 'employment_status',
+            'nssa claim number'                       => 'nssa_claim_number',
+            'description of events'                   => 'description_of_events',
+            'department of injured'                   => 'department',
+            'department'                              => 'department',
+            'manager /supervisor'                     => 'manager_supervisor',
+            'manager/supervisor'                      => 'manager_supervisor',
+            'manager supervisor'                      => 'manager_supervisor',
+            'source of injury'                        => 'source_of_injury',
+            'location /work area'                     => 'location_work_area',
+            'location/work area'                      => 'location_work_area',
+            'location work area'                      => 'location_work_area',
+            'part of body injured'                    => 'part_of_body_injured',
+            'nature of injury'                        => 'nature_of_injury',
+            'days lost'                               => 'days_lost',
+            'medical treatment'                       => 'medical_treatment',
+            'corrective action taken or recommended'  => 'corrective_action',
+            'corrective action'                       => 'corrective_action',
         ];
 
-        $rows = [];
+        $rawRows = [];
 
-        if ($ext === 'csv') {
-            $handle = fopen($file->getRealPath(), 'r');
-            $headers = null;
-            while (($row = fgetcsv($handle)) !== false) {
-                if (!$headers) {
-                    $headers = array_map(fn($h) => strtolower(trim($h)), $row);
-                    continue;
+        if (in_array($ext, ['xlsx', 'xls'])) {
+            if (!class_exists(\PhpOffice\PhpSpreadsheet\IOFactory::class)) {
+                return response()->json(['message' => 'Excel upload is not supported on this server. Please export your file as CSV and upload that instead.'], 422);
+            }
+            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($file->getRealPath());
+            $sheet = $spreadsheet->getActiveSheet();
+            foreach ($sheet->getRowIterator() as $row) {
+                $cellIterator = $row->getCellIterator();
+                $cellIterator->setIterateOnlyExistingCells(false);
+                $rowData = [];
+                foreach ($cellIterator as $cell) {
+                    $rowData[] = $cell->getValue();
                 }
-                $rows[] = array_combine($headers, array_pad($row, count($headers), null));
+                $rawRows[] = $rowData;
+            }
+        } else {
+            $handle = fopen($file->getRealPath(), 'r');
+            while (($line = fgetcsv($handle)) !== false) {
+                $rawRows[] = $line;
             }
             fclose($handle);
-        } else {
-            $spreadsheet = IOFactory::load($file->getRealPath());
-            $sheet = $spreadsheet->getActiveSheet();
-            $sheetData = $sheet->toArray(null, true, true, false);
-            $headers = null;
-            foreach ($sheetData as $row) {
-                if (!$headers) {
-                    $headers = array_map(fn($h) => strtolower(trim((string)$h)), $row);
-                    continue;
-                }
-                if (empty(array_filter($row))) continue;
-                $rows[] = array_combine($headers, array_pad($row, count($headers), null));
-            }
         }
+
+        if (count($rawRows) < 2) {
+            return response()->json(['message' => 'File is empty or has no data rows.'], 422);
+        }
+
+        $headers = array_map(fn($h) => trim(preg_replace('/\s+/', ' ', strtolower((string)$h))), $rawRows[0]);
+        $dataRows = array_slice($rawRows, 1);
 
         $imported = 0;
         $skipped  = 0;
 
-        foreach ($rows as $row) {
+        foreach ($dataRows as $rowData) {
+            if (empty(array_filter($rowData, fn($v) => $v !== null && $v !== ''))) {
+                $skipped++;
+                continue;
+            }
+
+            $row = array_combine($headers, array_pad($rowData, count($headers), null));
+
             $mapped = [];
             foreach ($row as $col => $val) {
-                $colClean = trim(preg_replace('/\s+/', ' ', strtolower($col)));
-                if (isset($headerMap[$colClean])) {
-                    $mapped[$headerMap[$colClean]] = trim((string)$val);
+                if (isset($headerMap[$col])) {
+                    $mapped[$headerMap[$col]] = trim((string)$val);
                 }
             }
 
             if (empty($mapped['iod_number'])) { $skipped++; continue; }
 
-            if (is_numeric($mapped['date_of_injury'] ?? null)) {
-                try {
-                    $mapped['date_of_injury'] = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($mapped['date_of_injury'])->format('Y-m-d');
-                } catch (\Exception $e) {}
-            } elseif (!empty($mapped['date_of_injury'])) {
-                try {
-                    $mapped['date_of_injury'] = date('Y-m-d', strtotime($mapped['date_of_injury']));
-                } catch (\Exception $e) {}
+            // Parse date — handle Excel serial numbers and common date strings
+            if (!empty($mapped['date_of_injury'])) {
+                if (is_numeric($mapped['date_of_injury']) && class_exists(\PhpOffice\PhpSpreadsheet\Shared\Date::class)) {
+                    try {
+                        $mapped['date_of_injury'] = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float)$mapped['date_of_injury'])->format('Y-m-d');
+                    } catch (\Exception $e) { $mapped['date_of_injury'] = null; }
+                } else {
+                    $parsed = strtotime($mapped['date_of_injury']);
+                    $mapped['date_of_injury'] = $parsed ? date('Y-m-d', $parsed) : null;
+                }
             }
 
             SheAccidentRecord::updateOrCreate(
@@ -175,6 +186,10 @@ class SheAccidentController extends Controller
         }
 
         $this->logActivity($request, 'SHE Accident Import', "Imported {$imported} records, skipped {$skipped}");
-        return response()->json(['message' => "Imported {$imported} records. Skipped {$skipped}."]);
+        return response()->json([
+            'message'  => "Imported {$imported} record(s) successfully." . ($skipped ? " {$skipped} row(s) skipped." : ''),
+            'imported' => $imported,
+            'skipped'  => $skipped,
+        ]);
     }
 }
