@@ -33,16 +33,17 @@ class SheAccidentController extends Controller
         }
         $iodNumber = sprintf('IOD/%s/%03d', $year, $seq);
 
-        $record = SheAccidentRecord::create(array_merge(
-            $request->only([
-                'name_of_injured', 'day_of_week', 'date_of_injury', 'time_of_injury',
-                'age', 'designation', 'employment_status', 'nssa_claim_number',
-                'description_of_events', 'department', 'manager_supervisor',
-                'source_of_injury', 'location_work_area', 'part_of_body_injured',
-                'nature_of_injury', 'days_lost', 'medical_treatment', 'corrective_action',
-            ]),
-            ['iod_number' => $iodNumber]
-        ));
+        $data = $request->only([
+            'name_of_injured', 'day_of_week', 'date_of_injury', 'time_of_injury',
+            'age', 'designation', 'employment_status', 'nssa_claim_number',
+            'description_of_events', 'department', 'manager_supervisor',
+            'source_of_injury', 'location_work_area', 'part_of_body_injured',
+            'nature_of_injury', 'days_lost', 'medical_treatment', 'corrective_action',
+        ]);
+        if (isset($data['date_of_injury']) && $data['date_of_injury'] === '') {
+            $data['date_of_injury'] = null;
+        }
+        $record = SheAccidentRecord::create(array_merge($data, ['iod_number' => $iodNumber]));
 
         $this->logActivity($request, 'SHE Accident Record Created', 'Created IOD record ' . $iodNumber);
         return response()->json($record, 201);
@@ -52,13 +53,17 @@ class SheAccidentController extends Controller
     {
         $this->authorizeModule($request, 'SHE Compliance', 'edit');
         $record = SheAccidentRecord::findOrFail($id);
-        $record->update($request->only([
+        $data = $request->only([
             'name_of_injured', 'day_of_week', 'date_of_injury', 'time_of_injury',
             'age', 'designation', 'employment_status', 'nssa_claim_number',
             'description_of_events', 'department', 'manager_supervisor',
             'source_of_injury', 'location_work_area', 'part_of_body_injured',
             'nature_of_injury', 'days_lost', 'medical_treatment', 'corrective_action',
-        ]));
+        ]);
+        if (isset($data['date_of_injury']) && $data['date_of_injury'] === '') {
+            $data['date_of_injury'] = null;
+        }
+        $record->update($data);
         $this->logActivity($request, 'SHE Accident Record Updated', 'Updated IOD record ' . $record->iod_number);
         return response()->json($record);
     }
@@ -160,7 +165,8 @@ class SheAccidentController extends Controller
             $mapped = [];
             foreach ($row as $col => $val) {
                 if (isset($headerMap[$col])) {
-                    $mapped[$headerMap[$col]] = trim((string)$val);
+                    $cleaned = trim((string)$val);
+                    $mapped[$headerMap[$col]] = $cleaned === '' ? null : $cleaned;
                 }
             }
 
@@ -176,6 +182,8 @@ class SheAccidentController extends Controller
                     $parsed = strtotime($mapped['date_of_injury']);
                     $mapped['date_of_injury'] = $parsed ? date('Y-m-d', $parsed) : null;
                 }
+            } else {
+                $mapped['date_of_injury'] = null;
             }
 
             SheAccidentRecord::updateOrCreate(
