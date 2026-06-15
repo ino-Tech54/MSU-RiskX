@@ -10,6 +10,7 @@ use App\Http\Controllers\LossEventController;
 use App\Http\Controllers\BcmController;
 use App\Http\Controllers\InsuranceClaimController;
 use App\Http\Controllers\ReportsController;
+use App\Http\Controllers\SheAccidentController;
 
 use App\Http\Controllers\AdminController;
 
@@ -64,6 +65,14 @@ Route::prefix('she-events')->group(function () {
 });
 
 Route::get('/she-metadata', [SheController::class, 'getMetadata']);
+
+Route::prefix('she-accidents')->group(function () {
+    Route::get('/', [SheAccidentController::class, 'index']);
+    Route::post('/', [SheAccidentController::class, 'store']);
+    Route::post('/import', [SheAccidentController::class, 'import']);
+    Route::put('/{id}', [SheAccidentController::class, 'update']);
+    Route::delete('/{id}', [SheAccidentController::class, 'destroy']);
+});
 
 Route::get('/dashboard-stats', [DashboardController::class, 'stats']);
 
