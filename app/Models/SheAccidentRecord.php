@@ -24,6 +24,8 @@ class SheAccidentRecord extends Model
         'nssa_claim_number',
         'description_of_events',
         'department',
+        'department_id',
+        'sub_department_id',
         'manager_supervisor',
         'source_of_injury',
         'location_work_area',

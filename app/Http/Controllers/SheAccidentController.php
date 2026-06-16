@@ -36,12 +36,16 @@ class SheAccidentController extends Controller
         $data = $request->only([
             'name_of_injured', 'day_of_week', 'date_of_injury', 'time_of_injury',
             'age', 'designation', 'employment_status', 'nssa_claim_number',
-            'description_of_events', 'department', 'manager_supervisor',
-            'source_of_injury', 'location_work_area', 'part_of_body_injured',
-            'nature_of_injury', 'days_lost', 'medical_treatment', 'corrective_action',
+            'description_of_events', 'department', 'department_id', 'sub_department_id',
+            'manager_supervisor', 'source_of_injury', 'location_work_area',
+            'part_of_body_injured', 'nature_of_injury', 'days_lost',
+            'medical_treatment', 'corrective_action',
         ]);
         if (isset($data['date_of_injury']) && $data['date_of_injury'] === '') {
             $data['date_of_injury'] = null;
+        }
+        foreach (['department_id', 'sub_department_id'] as $f) {
+            if (isset($data[$f]) && $data[$f] === '') $data[$f] = null;
         }
         $record = SheAccidentRecord::create(array_merge($data, ['iod_number' => $iodNumber]));
 
@@ -56,12 +60,16 @@ class SheAccidentController extends Controller
         $data = $request->only([
             'name_of_injured', 'day_of_week', 'date_of_injury', 'time_of_injury',
             'age', 'designation', 'employment_status', 'nssa_claim_number',
-            'description_of_events', 'department', 'manager_supervisor',
-            'source_of_injury', 'location_work_area', 'part_of_body_injured',
-            'nature_of_injury', 'days_lost', 'medical_treatment', 'corrective_action',
+            'description_of_events', 'department', 'department_id', 'sub_department_id',
+            'manager_supervisor', 'source_of_injury', 'location_work_area',
+            'part_of_body_injured', 'nature_of_injury', 'days_lost',
+            'medical_treatment', 'corrective_action',
         ]);
         if (isset($data['date_of_injury']) && $data['date_of_injury'] === '') {
             $data['date_of_injury'] = null;
+        }
+        foreach (['department_id', 'sub_department_id'] as $f) {
+            if (isset($data[$f]) && $data[$f] === '') $data[$f] = null;
         }
         $record->update($data);
         $this->logActivity($request, 'SHE Accident Record Updated', 'Updated IOD record ' . $record->iod_number);
@@ -117,7 +125,20 @@ class SheAccidentController extends Controller
             'medical treatment'                       => 'medical_treatment',
             'corrective action taken or recommended'  => 'corrective_action',
             'corrective action'                       => 'corrective_action',
+            'department of injured'                   => '_dept_name',
+            'department'                              => '_dept_name',
+            'functional unit'                         => '_sub_dept_name',
+            'sub department'                          => '_sub_dept_name',
+            'sub-department'                          => '_sub_dept_name',
+            'subdepartment'                           => '_sub_dept_name',
         ];
+
+        // Pre-load departments for matching
+        $deptLookup = DB::table('departments')
+            ->pluck('department_id', DB::raw('LOWER(department_name)'))
+            ->toArray();
+        // Pre-load all sub-departments
+        $subDeptRows = DB::table('sub_departments')->get();
 
         $rawRows = [];
 
@@ -171,6 +192,27 @@ class SheAccidentController extends Controller
             }
 
             if (empty($mapped['iod_number'])) { $skipped++; continue; }
+
+            // Resolve department from name
+            if (!empty($mapped['_dept_name'])) {
+                $deptKey = strtolower(trim($mapped['_dept_name']));
+                $mapped['department'] = $mapped['_dept_name'];
+                $mapped['department_id'] = $deptLookup[$deptKey] ?? null;
+                unset($mapped['_dept_name']);
+            }
+
+            // Resolve sub-department from name (only if dept was resolved)
+            if (!empty($mapped['_sub_dept_name']) && !empty($mapped['department_id'])) {
+                $subName = strtolower(trim($mapped['_sub_dept_name']));
+                $sub = $subDeptRows->first(fn($s) =>
+                    $s->department_id === $mapped['department_id'] &&
+                    str_contains(strtolower($s->name), $subName)
+                );
+                $mapped['sub_department_id'] = $sub?->id ?? null;
+                unset($mapped['_sub_dept_name']);
+            } else {
+                unset($mapped['_sub_dept_name']);
+            }
 
             // Parse date — handle Excel serial numbers and common date strings
             if (!empty($mapped['date_of_injury'])) {

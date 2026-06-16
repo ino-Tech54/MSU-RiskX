@@ -11,6 +11,7 @@ use App\Http\Controllers\BcmController;
 use App\Http\Controllers\InsuranceClaimController;
 use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\SheAccidentController;
+use App\Http\Controllers\DepartmentController;
 
 use App\Http\Controllers\AdminController;
 
@@ -65,6 +66,9 @@ Route::prefix('she-events')->group(function () {
 });
 
 Route::get('/she-metadata', [SheController::class, 'getMetadata']);
+
+Route::get('/departments', [DepartmentController::class, 'index']);
+Route::get('/departments/{id}/sub-departments', [DepartmentController::class, 'subDepartments']);
 
 Route::prefix('she-accidents')->group(function () {
     Route::get('/', [SheAccidentController::class, 'index']);
