@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Department;
+use App\Models\SubDepartment;
 
 class Risk extends Model
 {
@@ -26,5 +28,15 @@ class Risk extends Model
     public function controls()
     {
         return $this->hasMany(RiskControl::class, 'risk_id');
+    }
+
+    public function department()
+    {
+        return $this->belongsTo(Department::class, 'department_id', 'department_id');
+    }
+
+    public function subDepartment()
+    {
+        return $this->belongsTo(SubDepartment::class, 'sub_department_id', 'id');
     }
 }

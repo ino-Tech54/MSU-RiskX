@@ -11,7 +11,17 @@ class RiskController extends Controller
 {
     public function index()
     {
-        return response()->json(Risk::with('controls')->orderBy('id', 'DESC')->get());
+        return response()->json(
+            Risk::with(['controls', 'department:department_id,department_name', 'subDepartment:id,name'])
+                ->orderBy('id', 'DESC')
+                ->get()
+                ->map(function ($risk) {
+                    $arr = $risk->toArray();
+                    $arr['department_name']     = $risk->department?->department_name ?? $risk->department_id ?? null;
+                    $arr['sub_department_name'] = $risk->subDepartment?->name ?? null;
+                    return $arr;
+                })
+        );
     }
 
     public function store(Request $request)
