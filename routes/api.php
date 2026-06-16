@@ -68,7 +68,13 @@ Route::prefix('she-events')->group(function () {
 Route::get('/she-metadata', [SheController::class, 'getMetadata']);
 
 Route::get('/departments', [DepartmentController::class, 'index']);
+Route::post('/departments', [DepartmentController::class, 'storeDepartment']);
+Route::put('/departments/{id}', [DepartmentController::class, 'updateDepartment']);
+Route::delete('/departments/{id}', [DepartmentController::class, 'destroyDepartment']);
 Route::get('/departments/{id}/sub-departments', [DepartmentController::class, 'subDepartments']);
+Route::post('/departments/{id}/sub-departments', [DepartmentController::class, 'storeSubDepartment']);
+Route::put('/departments/{id}/sub-departments/{subId}', [DepartmentController::class, 'updateSubDepartment']);
+Route::delete('/departments/{id}/sub-departments/{subId}', [DepartmentController::class, 'destroySubDepartment']);
 
 Route::prefix('she-accidents')->group(function () {
     Route::get('/', [SheAccidentController::class, 'index']);
