@@ -117,6 +117,13 @@ class DepartmentController extends Controller
     {
         $dept = Department::findOrFail($id);
         $name = $dept->department_name;
+
+        // Detach any users assigned to this department to avoid FK violation
+        DB::table('users')->where('department_id', $id)->update([
+            'department_id'     => null,
+            'sub_department_id' => null,
+        ]);
+
         SubDepartment::where('department_id', $id)->delete();
         $dept->delete();
         $this->logActivity($request, 'Department Deleted', "Deleted department: {$name}");
