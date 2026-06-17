@@ -118,10 +118,12 @@ class DepartmentController extends Controller
         $dept = Department::findOrFail($id);
         $name = $dept->department_name;
 
-        // Detach any users assigned to this department to avoid FK violation
-        DB::table('users')->where('department_id', $id)->update([
-            'department_id' => null,
-        ]);
+        // Nullify department_id on all related tables to avoid FK violations
+        foreach (['users', 'risks', 'she_events', 'she_accident_records', 'bcm_plans', 'loss_events', 'insurance_claims'] as $table) {
+            if (DB::getSchemaBuilder()->hasColumn($table, 'department_id')) {
+                DB::table($table)->where('department_id', $id)->update(['department_id' => null]);
+            }
+        }
 
         SubDepartment::where('department_id', $id)->delete();
         $dept->delete();
