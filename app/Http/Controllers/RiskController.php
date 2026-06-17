@@ -151,7 +151,7 @@ class RiskController extends Controller
 
     public function importCsv(Request $request)
     {
-        $request->validate(['file' => 'required|file|mimes:csv,txt']);
+        $request->validate(['file' => 'required|file|mimes:csv,txt,xlsx,xls']);
 
         $file   = $request->file('file');
         $handle = fopen($file->getRealPath(), 'r');
