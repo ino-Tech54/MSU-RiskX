@@ -288,6 +288,57 @@ class ReportsController extends Controller
         return response()->json($query->get());
     }
 
+    public function filterOptions(Request $request)
+    {
+        $this->authorizeModule($request, 'Analysis & Reports', 'view');
+
+        $reportType = $request->input('report');
+        $options = [];
+
+        switch ($reportType) {
+            case 'risks':
+                $options = [
+                    'category' => DB::table('risks')->distinct()->whereNotNull('category')->pluck('category'),
+                    'status' => DB::table('risks')->distinct()->whereNotNull('status')->pluck('status'),
+                    'inherent_likelihood' => DB::table('risks')->distinct()->whereNotNull('inherent_likelihood')->pluck('inherent_likelihood'),
+                    'inherent_consequence' => DB::table('risks')->distinct()->whereNotNull('inherent_consequence')->pluck('inherent_consequence'),
+                ];
+                break;
+
+            case 'she':
+                $options = [
+                    'activity_category' => DB::table('she_events')->distinct()->whereNotNull('activity_category')->pluck('activity_category'),
+                    'priority' => DB::table('she_events')->distinct()->whereNotNull('priority')->pluck('priority'),
+                    'status' => DB::table('she_events')->distinct()->whereNotNull('status')->pluck('status'),
+                ];
+                break;
+
+            case 'accidents':
+                $options = [
+                    'source_of_injury' => DB::table('she_accident_records')->distinct()->whereNotNull('source_of_injury')->pluck('source_of_injury'),
+                    'nature_of_injury' => DB::table('she_accident_records')->distinct()->whereNotNull('nature_of_injury')->pluck('nature_of_injury'),
+                ];
+                break;
+
+            case 'losses':
+                $options = [
+                    'case_category' => DB::table('loss_events')->distinct()->whereNotNull('case_category')->pluck('case_category'),
+                    'misconduct_type' => DB::table('loss_events')->distinct()->whereNotNull('misconduct_type')->pluck('misconduct_type'),
+                    'priority_level' => DB::table('loss_events')->distinct()->whereNotNull('priority_level')->pluck('priority_level'),
+                    'status' => DB::table('loss_events')->distinct()->whereNotNull('status')->pluck('status'),
+                ];
+                break;
+
+            case 'bcm':
+                $options = [
+                    'plan_status' => DB::table('bcm_plans')->distinct()->whereNotNull('plan_status')->pluck('plan_status'),
+                ];
+                break;
+        }
+
+        return response()->json($options);
+    }
+
     public function auditTrail(Request $request)
     {
         $user = $request->user();

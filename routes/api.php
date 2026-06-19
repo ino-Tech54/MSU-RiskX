@@ -125,6 +125,7 @@ Route::get('/reports/accidents', [ReportsController::class, 'accidents']);
 Route::get('/reports/loss-events', [ReportsController::class, 'lossEvents']);
 Route::get('/reports/bcm-plans', [ReportsController::class, 'bcmPlans']);
 Route::get('/reports/audit-trail', [ReportsController::class, 'auditTrail']);
+Route::get('/reports/filter-options', [ReportsController::class, 'filterOptions']);
 
     Route::get('/user', function (Request $request) {
         return $request->user();
