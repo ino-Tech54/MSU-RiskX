@@ -143,6 +143,25 @@ class ReportsController extends Controller
         if ($request->filled('to')) {
             $query->whereDate('created_at', '<=', $request->to);
         }
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+        // Additional Risk filters
+        if ($request->filled('category')) {
+            $query->where('category', $request->category);
+        }
+        if ($request->filled('inherent_likelihood')) {
+            $query->where('inherent_likelihood', $request->inherent_likelihood);
+        }
+        if ($request->filled('inherent_consequence')) {
+            $query->where('inherent_consequence', $request->inherent_consequence);
+        }
+        if ($request->filled('risk_score_min')) {
+            $query->where('inherent_risk_score', '>=', $request->risk_score_min);
+        }
+        if ($request->filled('risk_score_max')) {
+            $query->where('inherent_risk_score', '<=', $request->risk_score_max);
+        }
 
         return response()->json($query->get());
     }
@@ -164,6 +183,16 @@ class ReportsController extends Controller
         }
         if ($request->filled('to')) {
             $query->whereDate('created_at', '<=', $request->to);
+        }
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+        // Additional SHE filters
+        if ($request->filled('activity_category')) {
+            $query->where('activity_category', $request->activity_category);
+        }
+        if ($request->filled('priority')) {
+            $query->where('priority', $request->priority);
         }
 
         return response()->json($query->get());
@@ -191,6 +220,9 @@ class ReportsController extends Controller
         if ($request->filled('to')) {
             $query->whereDate('loss_date', '<=', $request->to);
         }
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
 
         return response()->json($query->get());
     }
@@ -216,6 +248,41 @@ class ReportsController extends Controller
         }
         if ($request->filled('to')) {
             $query->whereDate('created_at', '<=', $request->to);
+        }
+        if ($request->filled('status')) {
+            $query->where('plan_status', $request->status);
+        }
+
+        return response()->json($query->get());
+    }
+
+    public function accidents(Request $request)
+    {
+        $this->authorizeModule($request, 'Analysis & Reports', 'view');
+
+        if (!Schema::hasTable('she_accident_records')) {
+            return response()->json([]);
+        }
+
+        $query = \App\Models\SheAccidentRecord::orderBy('date_of_injury', 'DESC');
+
+        if (!$this->isAdminUser($request) && $dept = $this->userDeptId($request)) {
+            $query->where('department_id', $dept);
+        } elseif ($request->filled('department_id')) {
+            $query->where('department_id', $request->department_id);
+        }
+        if ($request->filled('from')) {
+            $query->whereDate('date_of_injury', '>=', $request->from);
+        }
+        if ($request->filled('to')) {
+            $query->whereDate('date_of_injury', '<=', $request->to);
+        }
+        // Additional Accident filters
+        if ($request->filled('source_of_injury')) {
+            $query->where('source_of_injury', 'like', '%' . $request->source_of_injury . '%');
+        }
+        if ($request->filled('nature_of_injury')) {
+            $query->where('nature_of_injury', 'like', '%' . $request->nature_of_injury . '%');
         }
 
         return response()->json($query->get());

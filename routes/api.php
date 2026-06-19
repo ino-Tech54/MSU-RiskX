@@ -121,6 +121,7 @@ Route::get('/bcm-metadata', [BcmController::class, 'metadata']);
 Route::get('/reports/summary', [ReportsController::class, 'summary']);
 Route::get('/reports/risks', [ReportsController::class, 'risks']);
 Route::get('/reports/she-events', [ReportsController::class, 'sheEvents']);
+Route::get('/reports/accidents', [ReportsController::class, 'accidents']);
 Route::get('/reports/loss-events', [ReportsController::class, 'lossEvents']);
 Route::get('/reports/bcm-plans', [ReportsController::class, 'bcmPlans']);
 Route::get('/reports/audit-trail', [ReportsController::class, 'auditTrail']);
