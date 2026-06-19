@@ -62,8 +62,15 @@ class LossEventController extends Controller
                 'property_involved' => 'nullable|string|max:255',
                 'estimate_value' => 'nullable|numeric|min:0',
                 'corrective_action' => 'nullable|string',
+                'corrective_action_recommendation' => 'nullable|string',
+                'corrective_action_taken' => 'nullable|string',
                 'action_owner' => 'nullable|string|max:255',
                 'quarter' => 'nullable|string|max:30',
+                'police_report_file' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:5120',
+                'estimated_loss_value' => 'nullable|numeric|min:0',
+                'estimated_recovery_value' => 'nullable|numeric|min:0',
+                'misconduct_type' => 'nullable|string|in:Staff Misconduct,Student Misconduct',
+                'case_prefix' => 'nullable|string|max:10',
             ]);
         }
 
@@ -76,10 +83,20 @@ class LossEventController extends Controller
         $data['status'] = $data['status'] ?? ($recordType === 'loss_control' ? 'Open' : 'Open');
 
         if ($recordType === 'loss_control') {
-            $data['case_number'] = $this->nextCaseNumber();
+            $prefix = $data['case_prefix'] ?? 'LC';
+            $data['case_number'] = $this->nextCaseNumber($prefix);
             $data['loss_reference'] = $data['case_number'];
+            $data['case_prefix'] = $prefix;
         } else {
             $data['loss_reference'] = $this->nextReference();
+        }
+
+        // Handle police report file upload
+        if ($request->hasFile('police_report_file')) {
+            $file = $request->file('police_report_file');
+            $filename = 'police_report_' . $data['loss_id'] . '_' . time() . '.' . $file->getClientOriginalExtension();
+            $file->storeAs('police_reports', $filename, 'public');
+            $data['police_report_file'] = $filename;
         }
 
         $event = LossEvent::create($data);
@@ -131,12 +148,27 @@ class LossEventController extends Controller
                 'property_involved' => 'nullable|string|max:255',
                 'estimate_value' => 'nullable|numeric|min:0',
                 'corrective_action' => 'nullable|string',
+                'corrective_action_recommendation' => 'nullable|string',
+                'corrective_action_taken' => 'nullable|string',
                 'action_owner' => 'nullable|string|max:255',
                 'quarter' => 'nullable|string|max:30',
+                'police_report_file' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:5120',
+                'estimated_loss_value' => 'nullable|numeric|min:0',
+                'estimated_recovery_value' => 'nullable|numeric|min:0',
+                'misconduct_type' => 'nullable|string|in:Staff Misconduct,Student Misconduct',
+                'case_prefix' => 'nullable|string|max:10',
             ]);
         }
 
         $data = $request->validate($rules);
+
+        // Handle police report file upload on update
+        if ($request->hasFile('police_report_file')) {
+            $file = $request->file('police_report_file');
+            $filename = 'police_report_' . $event->loss_id . '_' . time() . '.' . $file->getClientOriginalExtension();
+            $file->storeAs('police_reports', $filename, 'public');
+            $data['police_report_file'] = $filename;
+        }
 
         $event->update($data);
         $this->logActivity($request, 'Loss Event Updated', 'Updated ' . $event->record_type . ' ' . $event->loss_reference . ' fields: ' . implode(', ', array_keys($data)));
@@ -400,12 +432,12 @@ class LossEventController extends Controller
         return sprintf('%s-LOSS-%03d', $year, $count);
     }
 
-    private function nextCaseNumber(int $offset = 0): string
+    private function nextCaseNumber(string $prefix = 'LC', int $offset = 0): string
     {
         $year = date('Y');
         $count = LossEvent::where('record_type', 'loss_control')
-            ->where('case_number', 'LIKE', "IOD/$year/%")
+            ->where('case_number', 'LIKE', "$prefix % $year")
             ->count() + 1 + $offset;
-        return sprintf('IOD/%s/%03d', $year, $count);
+        return sprintf('%s %d %s', $prefix, $count, $year);
     }
 }

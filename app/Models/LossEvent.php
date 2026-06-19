@@ -42,8 +42,15 @@ class LossEvent extends Model
         'property_involved',
         'estimate_value',
         'corrective_action',
+        'corrective_action_recommendation',
+        'corrective_action_taken',
         'action_owner',
         'quarter',
+        'police_report_file',
+        'estimated_loss_value',
+        'estimated_recovery_value',
+        'misconduct_type',
+        'case_prefix',
     ];
 
     protected $casts = [
