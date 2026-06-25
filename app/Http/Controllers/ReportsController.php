@@ -302,6 +302,7 @@ class ReportsController extends Controller
                     'status' => DB::table('risks')->distinct()->whereNotNull('status')->pluck('status'),
                     'inherent_likelihood' => DB::table('risks')->distinct()->whereNotNull('inherent_likelihood')->pluck('inherent_likelihood'),
                     'inherent_consequence' => DB::table('risks')->distinct()->whereNotNull('inherent_consequence')->pluck('inherent_consequence'),
+                    'inherent_risk_scores' => DB::table('risks')->distinct()->whereNotNull('inherent_risk_score')->orderBy('inherent_risk_score')->pluck('inherent_risk_score'),
                 ];
                 break;
 
